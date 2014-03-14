@@ -3,8 +3,6 @@ $ ->
     constructor: (@tracks) ->
       @currentTrack = 0
       @videoPlaying = false
-      @displayWidth = $(document).width()
-      @displayHeight = $(document).height()
 
       @videoCanvas = @createCanvas()
       @videoContext = @createContext @videoCanvas
@@ -12,17 +10,28 @@ $ ->
       @aniCanvas = @createCanvas()
       @aniContext = @createContext @aniCanvas
 
+      @setDimensions()
+
       $('body').html(@videoCanvas)
       $('body').append(@aniCanvas)
 
     createCanvas: ->
       canvas = document.createElement 'canvas'
-      canvas.width = @displayWidth
-      canvas.height = @displayHeight
       canvas
 
     createContext: (canvas) ->
       context = canvas.getContext '2d'
+
+    setDimensions: (canvas) ->
+      @displayWidth = $(document).width()
+      @displayHeight = $(document).height()
+
+      @videoCanvas.width = @displayWidth
+      @videoCanvas.height = @displayHeight
+
+      @aniCanvas.width = @displayWidth
+      @aniCanvas.height = @displayHeight
+
 
     play: ->
       devlog 'play'

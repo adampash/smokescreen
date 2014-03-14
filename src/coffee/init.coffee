@@ -13,4 +13,7 @@ $ ->
       src: '/assets/videos/ocean.mp4'
   ]
 
+  $(window).resize ->
+    player.setDimensions()
+
   # player.play()

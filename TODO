@@ -1,6 +1,11 @@
+TODO
 * Get cam access from the start
 * Create sequences
-* Autofit video to display
-* Adjust canvas to video size??
 * Write script to launch Chrome in fullscreen at smokescreen url
 * Set up SSL for smokescreen.dev
+* Adjust sequence to display size (so, for example, green rectangle scales to video)
+
+
+DONE
+x Adjust canvas to video size??
+x Autofit video to display

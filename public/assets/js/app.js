@@ -22,12 +22,11 @@
         this.drawSequence = __bind(this.drawSequence, this);
         this.currentTrack = 0;
         this.videoPlaying = false;
-        this.displayWidth = $(document).width();
-        this.displayHeight = $(document).height();
         this.videoCanvas = this.createCanvas();
         this.videoContext = this.createContext(this.videoCanvas);
         this.aniCanvas = this.createCanvas();
         this.aniContext = this.createContext(this.aniCanvas);
+        this.setDimensions();
         $('body').html(this.videoCanvas);
         $('body').append(this.aniCanvas);
       }
@@ -35,14 +34,21 @@
       Player.prototype.createCanvas = function() {
         var canvas;
         canvas = document.createElement('canvas');
-        canvas.width = this.displayWidth;
-        canvas.height = this.displayHeight;
         return canvas;
       };
 
       Player.prototype.createContext = function(canvas) {
         var context;
         return context = canvas.getContext('2d');
+      };
+
+      Player.prototype.setDimensions = function(canvas) {
+        this.displayWidth = $(document).width();
+        this.displayHeight = $(document).height();
+        this.videoCanvas.width = this.displayWidth;
+        this.videoCanvas.height = this.displayHeight;
+        this.aniCanvas.width = this.displayWidth;
+        return this.aniCanvas.height = this.displayHeight;
       };
 
       Player.prototype.play = function() {
@@ -140,7 +146,7 @@
 
 (function() {
   $(function() {
-    return window.player = new Player([
+    window.player = new Player([
       {
         type: 'video',
         src: '/assets/videos/short.mov',
@@ -155,6 +161,9 @@
         src: '/assets/videos/ocean.mp4'
       }
     ]);
+    return $(window).resize(function() {
+      return player.setDimensions();
+    });
   });
 
 }).call(this);
