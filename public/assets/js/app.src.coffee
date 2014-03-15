@@ -189,6 +189,7 @@ $ ->
 
 
 
+
 window.TestSequence =
   type: 'sequence'
   src: '/assets/videos/short.mov'

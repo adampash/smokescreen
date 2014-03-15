@@ -40,6 +40,13 @@ module.exports = (grunt) ->
         options:
           livereload: true
 
+      js:
+        files: '<%= project.assets %>/js/test.js'
+        tasks: ['jshint']
+
+    jshint:
+      all: ['<%= project.assets %>/js/test.js']
+
     coffee:
       dev:
         options:
@@ -66,4 +73,5 @@ module.exports = (grunt) ->
   grunt.loadNpmTasks 'grunt-contrib-sass'
   grunt.loadNpmTasks 'grunt-contrib-coffee'
   grunt.loadNpmTasks 'grunt-contrib-watch'
+  grunt.loadNpmTasks 'grunt-contrib-jshint'
   # grunt.registerTask 'sass', ['sass']
