@@ -1,4 +1,4 @@
 $ ->
   window.devlog = (args) ->
-    if true
-      console.log arguments
+    if false
+      console.log.apply console,  arguments
