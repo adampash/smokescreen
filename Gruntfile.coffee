@@ -18,6 +18,11 @@ module.exports = (grunt) ->
       ]
 
     watch:
+      options:
+        livereload:
+          port: 35729
+          key: grunt.file.read('src/server.key')
+          cert: grunt.file.read('src/server.crt')
       coffeescripts:
         files: ['<%= project.js %>']
         tasks: ['coffee:dev']

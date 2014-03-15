@@ -4,11 +4,9 @@ $ ->
       src: '/assets/videos/short.mov'
       aspect: 16/9
     ,
-      type: 'sequence'
-      src: '/assets/videos/short.mov'
-      callback: Sequences.green.play
-      duration: Sequences.green.duration
-      aspect: 16/9
+      TestSequence
+    ,
+      CamSequence
     ,
       type: 'video'
       src: '/assets/videos/ocean.mp4'

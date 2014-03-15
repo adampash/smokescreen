@@ -1,8 +1,8 @@
-window.TestSequence =
+window.CamSequence =
   type: 'sequence'
-  src: '/assets/videos/short.mov'
+  src: 'webcam'
   aspect: 16/9
-  duration: 2
+  duration: 5
   play: (context, elapsed) ->
     x = elapsed * 100
     y = elapsed * 100
@@ -19,3 +19,4 @@ window.TestSequence =
     context.clearRect(0, 0,
              canvas.width,
              canvas.height)
+

@@ -34,7 +34,7 @@ $ ->
 
 
     play: ->
-      devlog 'play'
+      log 'play'
 
       if @currentTrack < @tracks.length
         @queue @tracks[@currentTrack]
@@ -44,7 +44,7 @@ $ ->
       @play()
 
     queue: (track) ->
-      devlog 'queue', track
+      log 'queue', track
 
       if track.type is 'video'
         @playVideo track
@@ -52,7 +52,7 @@ $ ->
         @playSequence track
 
     playVideo: (track) ->
-      devlog 'playVideo'
+      log 'playVideo'
 
       @video = document.createElement 'video'
       @video.src = track.src
@@ -67,27 +67,30 @@ $ ->
       @drawVideo(track)
 
     playSequence: (track) ->
-      devlog 'playSequence'
+      log 'playSequence'
 
       @sequenceStart = new Date()
 
       if track.src?
-        @playVideo track
+        if track.src is 'webcam'
+          log 'get webcam'
+          track.src = webcam.src
+          @playVideo track
+        else
+          @playVideo track
       else
         @drawSequence track
 
     drawSequence: (track) =>
       elapsed = (new Date() - @sequenceStart) / 1000
-      track.callback.call(@, @aniContext, elapsed)
+      track.play.call(@, @aniContext, elapsed)
 
       if elapsed < track.duration
         requestAnimationFrame =>
           @drawSequence track
       else
-        devlog 'end sequence'
-        @aniContext.clearRect(0, 0,
-                 @aniCanvas.width,
-                 @aniCanvas.height)
+        log 'end sequence'
+        track.ended.call(@, @aniContext, @aniCanvas)
         @nextTrack()
 
     drawVideo: (track) =>
@@ -109,6 +112,6 @@ $ ->
           @drawSequence track
 
     videoEnded: ->
-      devlog 'ended'
+      log 'ended'
       @videoPlaying = false
       @nextTrack()

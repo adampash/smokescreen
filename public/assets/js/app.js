@@ -1,7 +1,7 @@
 (function() {
   $(function() {
-    return window.devlog = function(args) {
-      if (false) {
+    return window.log = function(args) {
+      if (true) {
         return console.log.apply(console, arguments);
       }
     };
@@ -51,7 +51,7 @@
       };
 
       Player.prototype.play = function() {
-        devlog('play');
+        log('play');
         if (this.currentTrack < this.tracks.length) {
           return this.queue(this.tracks[this.currentTrack]);
         }
@@ -63,7 +63,7 @@
       };
 
       Player.prototype.queue = function(track) {
-        devlog('queue', track);
+        log('queue', track);
         if (track.type === 'video') {
           return this.playVideo(track);
         } else if (track.type === 'sequence') {
@@ -72,7 +72,7 @@
       };
 
       Player.prototype.playVideo = function(track) {
-        devlog('playVideo');
+        log('playVideo');
         this.video = document.createElement('video');
         this.video.src = track.src;
         this.setupVideoListeners(this.video, track);
@@ -82,10 +82,16 @@
       };
 
       Player.prototype.playSequence = function(track) {
-        devlog('playSequence');
+        log('playSequence');
         this.sequenceStart = new Date();
         if (track.src != null) {
-          return this.playVideo(track);
+          if (track.src === 'webcam') {
+            log('get webcam');
+            track.src = webcam.src;
+            return this.playVideo(track);
+          } else {
+            return this.playVideo(track);
+          }
         } else {
           return this.drawSequence(track);
         }
@@ -94,7 +100,7 @@
       Player.prototype.drawSequence = function(track) {
         var elapsed;
         elapsed = (new Date() - this.sequenceStart) / 1000;
-        track.callback.call(this, this.aniContext, elapsed);
+        track.play.call(this, this.aniContext, elapsed);
         if (elapsed < track.duration) {
           return requestAnimationFrame((function(_this) {
             return function() {
@@ -102,8 +108,8 @@
             };
           })(this));
         } else {
-          devlog('end sequence');
-          this.aniContext.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
+          log('end sequence');
+          track.ended.call(this, this.aniContext, this.aniCanvas);
           return this.nextTrack();
         }
       };
@@ -140,7 +146,7 @@
       };
 
       Player.prototype.videoEnded = function() {
-        devlog('ended');
+        log('ended');
         this.videoPlaying = false;
         return this.nextTrack();
       };
@@ -153,19 +159,67 @@
 }).call(this);
 
 (function() {
+  window.CamSequence = {
+    type: 'sequence',
+    src: 'webcam',
+    aspect: 16 / 9,
+    duration: 5,
+    play: function(context, elapsed) {
+      var x, y;
+      x = elapsed * 100;
+      y = elapsed * 100;
+      context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
+      context.fillStyle = 'rgba(0, 100, 0, 0.4)';
+      context.fillOpacity = 0.1;
+      return context.fillRect(x, y, 400, 400);
+    },
+    ended: function(context, canvas) {
+      return context.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+}).call(this);
+
+(function() {
+  var constraints, errorCallback, successCallback;
+
+  navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
+
+  constraints = {
+    audio: false,
+    video: {
+      mandatory: {
+        minWidth: 1280,
+        minHeight: 720
+      }
+    }
+  };
+
+  successCallback = function(stream) {
+    window.webcam = stream;
+    if (window.URL) {
+      return webcam.src = window.URL.createObjectURL(stream);
+    } else {
+      return webcam.src = stream;
+    }
+  };
+
+  errorCallback = function(error) {
+    return log("navigator.getUserMedia error: ", error);
+  };
+
+  navigator.getUserMedia(constraints, successCallback, errorCallback);
+
+}).call(this);
+
+(function() {
   $(function() {
     window.player = new Player([
       {
         type: 'video',
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }, {
-        type: 'sequence',
-        src: '/assets/videos/short.mov',
-        callback: Sequences.green.play,
-        duration: Sequences.green.duration,
-        aspect: 16 / 9
-      }, {
+      }, TestSequence, CamSequence, {
         type: 'video',
         src: '/assets/videos/ocean.mp4',
         aspect: 16 / 9
@@ -180,23 +234,27 @@
 }).call(this);
 
 (function() {
-  console.log('cart');
+
 
 }).call(this);
 
 (function() {
-  window.Sequences = {
-    green: {
-      duration: 2,
-      play: function(context, elapsed) {
-        var x, y;
-        x = elapsed * 100;
-        y = elapsed * 100;
-        context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
-        context.fillStyle = 'rgba(0, 100, 0, 0.4)';
-        context.fillOpacity = 0.1;
-        return context.fillRect(x, y, 400, 400);
-      }
+  window.TestSequence = {
+    type: 'sequence',
+    src: '/assets/videos/short.mov',
+    aspect: 16 / 9,
+    duration: 2,
+    play: function(context, elapsed) {
+      var x, y;
+      x = elapsed * 100;
+      y = elapsed * 100;
+      context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
+      context.fillStyle = 'rgba(0, 100, 0, 0.4)';
+      context.fillOpacity = 0.1;
+      return context.fillRect(x, y, 400, 400);
+    },
+    ended: function(context, canvas) {
+      return context.clearRect(0, 0, canvas.width, canvas.height);
     }
   };
 
