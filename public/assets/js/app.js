@@ -1,8 +1,8 @@
 (function() {
   $(function() {
     return window.devlog = function(args) {
-      if (true) {
-        return console.log(arguments);
+      if (false) {
+        return console.log.apply(console, arguments);
       }
     };
   });
@@ -16,7 +16,6 @@
     return window.Player = (function() {
       function Player(tracks) {
         this.tracks = tracks;
-        this.removeVideoListeners = __bind(this.removeVideoListeners, this);
         this.setupVideoListeners = __bind(this.setupVideoListeners, this);
         this.drawVideo = __bind(this.drawVideo, this);
         this.drawSequence = __bind(this.drawSequence, this);
@@ -59,7 +58,6 @@
       };
 
       Player.prototype.nextTrack = function() {
-        this.removeVideoListeners();
         this.currentTrack++;
         return this.play();
       };
@@ -77,7 +75,7 @@
         devlog('playVideo');
         this.video = document.createElement('video');
         this.video.src = track.src;
-        this.setupVideoListeners(this.video);
+        this.setupVideoListeners(this.video, track);
         this.videoPlaying = true;
         this.video.play();
         return this.drawVideo(track);
@@ -87,15 +85,16 @@
         devlog('playSequence');
         this.sequenceStart = new Date();
         if (track.src != null) {
-          this.playVideo(track);
+          return this.playVideo(track);
+        } else {
+          return this.drawSequence(track);
         }
-        return this.drawSequence(track);
       };
 
       Player.prototype.drawSequence = function(track) {
         var elapsed;
-        track.callback.call(this, this.aniContext);
         elapsed = (new Date() - this.sequenceStart) / 1000;
+        track.callback.call(this, this.aniContext, elapsed);
         if (elapsed < track.duration) {
           return requestAnimationFrame((function(_this) {
             return function() {
@@ -123,18 +122,27 @@
         }
       };
 
-      Player.prototype.setupVideoListeners = function(video) {
-        return video.addEventListener('ended', (function(_this) {
-          return function() {
-            devlog('ended');
-            _this.videoPlaying = false;
-            return _this.nextTrack();
+      Player.prototype.setupVideoListeners = function(video, track) {
+        video.addEventListener('ended', (function(_this) {
+          return function(event) {
+            if (_this.video === event.srcElement) {
+              return _this.videoEnded();
+            }
           };
         })(this));
+        if (track.type === 'sequence') {
+          return video.addEventListener('playing', (function(_this) {
+            return function() {
+              return _this.drawSequence(track);
+            };
+          })(this));
+        }
       };
 
-      Player.prototype.removeVideoListeners = function(video) {
-        return this.video.removeEventListener('ended');
+      Player.prototype.videoEnded = function() {
+        devlog('ended');
+        this.videoPlaying = false;
+        return this.nextTrack();
       };
 
       return Player;
@@ -155,15 +163,18 @@
         type: 'sequence',
         src: '/assets/videos/short.mov',
         callback: Sequences.green.play,
-        duration: Sequences.green.duration
+        duration: Sequences.green.duration,
+        aspect: 16 / 9
       }, {
         type: 'video',
-        src: '/assets/videos/ocean.mp4'
+        src: '/assets/videos/ocean.mp4',
+        aspect: 16 / 9
       }
     ]);
-    return $(window).resize(function() {
+    $(window).resize(function() {
       return player.setDimensions();
     });
+    return player.play();
   });
 
 }).call(this);
@@ -176,12 +187,15 @@
 (function() {
   window.Sequences = {
     green: {
-      duration: 4,
-      play: function(context) {
+      duration: 2,
+      play: function(context, elapsed) {
+        var x, y;
+        x = elapsed * 100;
+        y = elapsed * 100;
         context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
         context.fillStyle = 'rgba(0, 100, 0, 0.4)';
         context.fillOpacity = 0.1;
-        return context.fillRect(0, 0, 400, 400);
+        return context.fillRect(x, y, 400, 400);
       }
     }
   };

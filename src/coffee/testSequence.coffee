@@ -1,7 +1,9 @@
 window.Sequences =
   green:
-    duration: 4
-    play: (context) ->
+    duration: 2
+    play: (context, elapsed) ->
+      x = elapsed * 100
+      y = elapsed * 100
       context.clearRect(0, 0,
                         @aniCanvas.width,
                         @aniCanvas.height)
@@ -9,4 +11,4 @@ window.Sequences =
 
       context.fillStyle = 'rgba(0, 100, 0, 0.4)'
       context.fillOpacity = 0.1
-      context.fillRect(0, 0, 400, 400)
+      context.fillRect(x, y, 400, 400)

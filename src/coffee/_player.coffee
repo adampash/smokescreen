@@ -40,7 +40,6 @@ $ ->
         @queue @tracks[@currentTrack]
 
     nextTrack: ->
-      @removeVideoListeners()
       @currentTrack++
       @play()
 
@@ -58,7 +57,7 @@ $ ->
       @video = document.createElement 'video'
       @video.src = track.src
 
-      @setupVideoListeners @video
+      @setupVideoListeners @video, track
 
       # $('body').append(@video)
 
@@ -74,11 +73,12 @@ $ ->
 
       if track.src?
         @playVideo track
-      @drawSequence track
+      else
+        @drawSequence track
 
     drawSequence: (track) =>
-      track.callback.call(@, @aniContext)
       elapsed = (new Date() - @sequenceStart) / 1000
+      track.callback.call(@, @aniContext, elapsed)
 
       if elapsed < track.duration
         requestAnimationFrame =>
@@ -99,11 +99,16 @@ $ ->
           @drawVideo track
 
 
-    setupVideoListeners: (video) =>
-      video.addEventListener 'ended', =>
-        devlog 'ended'
-        @videoPlaying = false
-        @nextTrack()
+    setupVideoListeners: (video, track) =>
+      video.addEventListener 'ended', (event) =>
+        if @video is event.srcElement
+          @videoEnded()
 
-    removeVideoListeners: (video) =>
-      @video.removeEventListener 'ended'
+      if track.type is 'sequence'
+        video.addEventListener 'playing', =>
+          @drawSequence track
+
+    videoEnded: ->
+      devlog 'ended'
+      @videoPlaying = false
+      @nextTrack()
