@@ -2,6 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     eventmachine (1.0.3)
+    sass (3.3.3)
     tunnels (1.2.2)
       eventmachine
 
@@ -9,4 +10,5 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  sass (~> 3.3.0)
   tunnels

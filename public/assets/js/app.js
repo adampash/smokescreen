@@ -1,4 +1,7 @@
 (function() {
+  var constraints, errorCallback, successCallback,
+    __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
+
   $(function() {
     return window.log = function(args) {
       if (true) {
@@ -6,11 +9,6 @@
       }
     };
   });
-
-}).call(this);
-
-(function() {
-  var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
     return window.Player = (function() {
@@ -156,9 +154,6 @@
     })();
   });
 
-}).call(this);
-
-(function() {
   window.CamSequence = {
     type: 'sequence',
     src: 'webcam',
@@ -177,11 +172,6 @@
       return context.clearRect(0, 0, canvas.width, canvas.height);
     }
   };
-
-}).call(this);
-
-(function() {
-  var constraints, errorCallback, successCallback;
 
   navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
@@ -210,9 +200,6 @@
 
   navigator.getUserMedia(constraints, successCallback, errorCallback);
 
-}).call(this);
-
-(function() {
   $(function() {
     window.player = new Player([
       {
@@ -231,14 +218,6 @@
     return player.play();
   });
 
-}).call(this);
-
-(function() {
-
-
-}).call(this);
-
-(function() {
   window.TestSequence = {
     type: 'sequence',
     src: '/assets/videos/short.mov',
@@ -259,3 +238,5 @@
   };
 
 }).call(this);
+
+//# sourceMappingURL=app.js.map

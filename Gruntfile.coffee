@@ -42,6 +42,8 @@ module.exports = (grunt) ->
 
     coffee:
       dev:
+        options:
+          sourceMap: true
         files:
           '<%= project.assets %>/js/app.js': '<%= project.js %>'
       dist:
@@ -52,6 +54,7 @@ module.exports = (grunt) ->
       dev:
         options:
           style: 'expanded'
+          # sourceMap: true
         files:
           '<%= project.assets %>/css/style.css': '<%= project.css %>'
       dist:
