@@ -4,16 +4,16 @@ $ ->
       @currentTrack = 0
       @videoPlaying = false
 
-      @videoCanvas = @createCanvas()
-      @videoContext = @createContext @videoCanvas
+      # @videoCanvas = @createCanvas()
+      # @videoContext = @createContext @videoCanvas
 
-      @aniCanvas = @createCanvas()
-      @aniContext = @createContext @aniCanvas
+      # @aniCanvas = @createCanvas()
+      # @aniContext = @createContext @aniCanvas
 
       @setDimensions()
 
-      $('body').html(@videoCanvas)
-      $('body').append(@aniCanvas)
+      # $('body').append(@videoCanvas)
+      # $('body').append(@aniCanvas)
 
     createCanvas: ->
       canvas = document.createElement 'canvas'
@@ -26,16 +26,15 @@ $ ->
       @displayWidth = $(document).width()
       @displayHeight = $(document).height()
 
-      @videoCanvas.width = @displayWidth
-      @videoCanvas.height = @displayHeight
+      # @videoCanvas.width = @displayWidth
+      # @videoCanvas.height = @displayHeight
 
-      @aniCanvas.width = @displayWidth
-      @aniCanvas.height = @displayHeight
+      # @aniCanvas.width = @displayWidth
+      # @aniCanvas.height = @displayHeight
 
 
     play: ->
       log 'play'
-
       if @currentTrack < @tracks.length
         @queue @tracks[@currentTrack]
 
@@ -46,12 +45,16 @@ $ ->
     queue: (track) ->
       log 'queue', track
 
-      # track.play()
+      track.play(
+        @, =>
+          log 'callback'
+          @nextTrack()
+      )
 
-      if track.type is 'video'
-        @playVideo track
-      else if track.type is 'sequence'
-        @playSequence track
+      # if track.type is 'video'
+      #   @playVideo track
+      # else if track.type is 'sequence'
+      #   @playSequence track
 
     playVideo: (track) ->
       log 'playVideo'

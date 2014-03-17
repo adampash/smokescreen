@@ -23,13 +23,7 @@
         this.drawSequence = __bind(this.drawSequence, this);
         this.currentTrack = 0;
         this.videoPlaying = false;
-        this.videoCanvas = this.createCanvas();
-        this.videoContext = this.createContext(this.videoCanvas);
-        this.aniCanvas = this.createCanvas();
-        this.aniContext = this.createContext(this.aniCanvas);
         this.setDimensions();
-        $('body').html(this.videoCanvas);
-        $('body').append(this.aniCanvas);
       }
 
       Player.prototype.createCanvas = function() {
@@ -45,11 +39,7 @@
 
       Player.prototype.setDimensions = function(canvas) {
         this.displayWidth = $(document).width();
-        this.displayHeight = $(document).height();
-        this.videoCanvas.width = this.displayWidth;
-        this.videoCanvas.height = this.displayHeight;
-        this.aniCanvas.width = this.displayWidth;
-        return this.aniCanvas.height = this.displayHeight;
+        return this.displayHeight = $(document).height();
       };
 
       Player.prototype.play = function() {
@@ -66,11 +56,12 @@
 
       Player.prototype.queue = function(track) {
         log('queue', track);
-        if (track.type === 'video') {
-          return this.playVideo(track);
-        } else if (track.type === 'sequence') {
-          return this.playSequence(track);
-        }
+        return track.play(this, (function(_this) {
+          return function() {
+            log('callback');
+            return _this.nextTrack();
+          };
+        })(this));
       };
 
       Player.prototype.playVideo = function(track) {
@@ -158,6 +149,209 @@
     })();
   });
 
+  $(function() {
+    return window.Sequence = (function() {
+      function Sequence(options) {
+        this.drawSequence = __bind(this.drawSequence, this);
+        this.type = 'sequence';
+        this.src = options.src;
+        this.aspect = options.aspect;
+        this.duration = options.duration;
+        this.canvas = this.createCanvas();
+        this.canvas.id = new Date().getTime();
+        this.context = this.createContext(this.canvas);
+        this.videoPlaying = false;
+      }
+
+      Sequence.prototype.play = function(player, callback) {
+        log('playSequence');
+        this.player = player;
+        this.callback = callback;
+        this.canvas.width = this.player.displayWidth;
+        this.canvas.height = this.player.displayHeight;
+        if (this.src != null) {
+          if (this.src === 'webcam') {
+            log('get webcam');
+            return this.src = webcam.src;
+          } else {
+            this.video = new VideoTrack({
+              src: this.src,
+              aspect: this.aspect
+            });
+            return this.video.play(this.player, null, {
+              onplaystart: (function(_this) {
+                return function() {
+                  return _this.startSequence();
+                };
+              })(this)
+            });
+          }
+        } else {
+          return this.startSequence();
+        }
+      };
+
+      Sequence.prototype.startSequence = function() {
+        $('body').append(this.canvas);
+        this.sequenceStart = new Date();
+        return this.drawSequence();
+      };
+
+      Sequence.prototype.drawSequence = function() {
+        var elapsed;
+        elapsed = (new Date() - this.sequenceStart) / 1000;
+        this.drawAnimation(this, elapsed);
+        if (elapsed < this.duration) {
+          return requestAnimationFrame((function(_this) {
+            return function() {
+              return _this.drawSequence();
+            };
+          })(this));
+        } else {
+          log('end sequence');
+          return this.ended();
+        }
+      };
+
+      Sequence.prototype.drawAnimation = function() {};
+
+      Sequence.prototype.cleanup = function() {
+        setTimeout((function(_this) {
+          return function() {
+            return $(_this.canvas).remove();
+          };
+        })(this), 300);
+        return this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      };
+
+      Sequence.prototype.createCanvas = function() {
+        var canvas;
+        canvas = document.createElement('canvas');
+        return canvas;
+      };
+
+      Sequence.prototype.createContext = function(canvas) {
+        var context;
+        return context = canvas.getContext('2d');
+      };
+
+      return Sequence;
+
+    })();
+  });
+
+  $(function() {
+    window.testSequence = new Sequence({
+      type: 'sequence',
+      src: '/assets/videos/short.mov',
+      aspect: 16 / 9,
+      duration: 5
+    });
+    testSequence.drawAnimation = function(context, elapsed) {
+      var x, y;
+      log('draw');
+      x = elapsed * 100;
+      y = elapsed * 100;
+      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.context.fillStyle = 'rgba(0, 100, 0, 0.4)';
+      this.context.fillOpacity = 0.1;
+      return this.context.fillRect(x, y, 400, 400);
+    };
+    return testSequence.ended = function() {
+      if (this.callback != null) {
+        this.callback();
+      }
+      return this.cleanup();
+    };
+  });
+
+  $(function() {
+    return window.VideoTrack = (function() {
+      function VideoTrack(options) {
+        this.setupVideoListeners = __bind(this.setupVideoListeners, this);
+        this.drawVideo = __bind(this.drawVideo, this);
+        this.type = 'video';
+        this.src = options.src;
+        this.aspect = options.aspect;
+        this.canvas = this.createCanvas();
+        this.canvas.id = new Date().getTime();
+        this.context = this.createContext(this.canvas);
+        this.videoPlaying = false;
+      }
+
+      VideoTrack.prototype.play = function(player, callback, options) {
+        log('playVideo');
+        this.player = player;
+        this.callback = callback;
+        if (options) {
+          if (options.onplaystart != null) {
+            this.onplaystart = options.onplaystart;
+          }
+        }
+        $('body').append(this.canvas);
+        this.canvas.width = this.player.displayWidth;
+        this.canvas.height = this.player.displayHeight;
+        this.video = document.createElement('video');
+        this.video.src = this.src;
+        this.setupVideoListeners(this.video);
+        return this.video.play();
+      };
+
+      VideoTrack.prototype.drawVideo = function() {
+        var height, spacer;
+        height = this.player.displayWidth / this.aspect;
+        spacer = (this.player.displayHeight - height) / 2;
+        this.context.drawImage(this.video, 0, spacer, this.player.displayWidth, height);
+        if (this.videoPlaying) {
+          return requestAnimationFrame((function(_this) {
+            return function() {
+              return _this.drawVideo();
+            };
+          })(this));
+        }
+      };
+
+      VideoTrack.prototype.setupVideoListeners = function(video) {
+        video.addEventListener('playing', (function(_this) {
+          return function(event) {
+            if (_this.onplaystart != null) {
+              _this.onplaystart();
+            }
+            _this.videoPlaying = true;
+            return _this.drawVideo();
+          };
+        })(this));
+        return video.addEventListener('ended', (function(_this) {
+          return function(event) {
+            if (_this.video === event.srcElement) {
+              _this.videoPlaying = false;
+              setTimeout(function() {
+                return $(_this.canvas).remove();
+              }, 300);
+              if (_this.callback != null) {
+                return _this.callback();
+              }
+            }
+          };
+        })(this));
+      };
+
+      VideoTrack.prototype.createCanvas = function() {
+        var canvas;
+        canvas = document.createElement('canvas');
+        return canvas;
+      };
+
+      VideoTrack.prototype.createContext = function(canvas) {
+        var context;
+        return context = canvas.getContext('2d');
+      };
+
+      return VideoTrack;
+
+    })();
+  });
+
   window.CamSequence = {
     type: 'sequence',
     src: 'webcam',
@@ -221,40 +415,19 @@
 
   $(function() {
     window.player = new Player([
-      {
-        type: 'video',
+      new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }, TestSequence, CamSequence, {
-        type: 'video',
+      }), testSequence, new VideoTrack({
         src: '/assets/videos/ocean.mp4',
         aspect: 16 / 9
-      }
+      }), CamSequence
     ]);
     $(window).resize(function() {
       return player.setDimensions();
     });
     return player.play();
   });
-
-  window.TestSequence = {
-    type: 'sequence',
-    src: '/assets/videos/short.mov',
-    aspect: 16 / 9,
-    duration: 2,
-    play: function(context, elapsed) {
-      var x, y;
-      x = elapsed * 100;
-      y = elapsed * 100;
-      context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
-      context.fillStyle = 'rgba(0, 100, 0, 0.4)';
-      context.fillOpacity = 0.1;
-      return context.fillRect(x, y, 400, 400);
-    },
-    ended: function(context, canvas) {
-      return context.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  };
 
 }).call(this);
 

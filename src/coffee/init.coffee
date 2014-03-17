@@ -1,16 +1,16 @@
 $ ->
   window.player = new Player [
-      type: 'video'
-      src: '/assets/videos/short.mov'
-      aspect: 16/9
+      new VideoTrack
+        src: '/assets/videos/short.mov'
+        aspect: 16/9
     ,
-      TestSequence
+      testSequence
+    ,
+      new VideoTrack
+        src: '/assets/videos/ocean.mp4'
+        aspect: 16/9
     ,
       CamSequence
-    ,
-      type: 'video'
-      src: '/assets/videos/ocean.mp4'
-      aspect: 16/9
   ]
 
   $(window).resize ->

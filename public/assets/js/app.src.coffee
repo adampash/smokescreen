@@ -13,16 +13,16 @@ $ ->
       @currentTrack = 0
       @videoPlaying = false
 
-      @videoCanvas = @createCanvas()
-      @videoContext = @createContext @videoCanvas
+      # @videoCanvas = @createCanvas()
+      # @videoContext = @createContext @videoCanvas
 
-      @aniCanvas = @createCanvas()
-      @aniContext = @createContext @aniCanvas
+      # @aniCanvas = @createCanvas()
+      # @aniContext = @createContext @aniCanvas
 
       @setDimensions()
 
-      $('body').html(@videoCanvas)
-      $('body').append(@aniCanvas)
+      # $('body').append(@videoCanvas)
+      # $('body').append(@aniCanvas)
 
     createCanvas: ->
       canvas = document.createElement 'canvas'
@@ -35,16 +35,15 @@ $ ->
       @displayWidth = $(document).width()
       @displayHeight = $(document).height()
 
-      @videoCanvas.width = @displayWidth
-      @videoCanvas.height = @displayHeight
+      # @videoCanvas.width = @displayWidth
+      # @videoCanvas.height = @displayHeight
 
-      @aniCanvas.width = @displayWidth
-      @aniCanvas.height = @displayHeight
+      # @aniCanvas.width = @displayWidth
+      # @aniCanvas.height = @displayHeight
 
 
     play: ->
       log 'play'
-
       if @currentTrack < @tracks.length
         @queue @tracks[@currentTrack]
 
@@ -55,12 +54,16 @@ $ ->
     queue: (track) ->
       log 'queue', track
 
-      # track.play()
+      track.play(
+        @, =>
+          log 'callback'
+          @nextTrack()
+      )
 
-      if track.type is 'video'
-        @playVideo track
-      else if track.type is 'sequence'
-        @playSequence track
+      # if track.type is 'video'
+      #   @playVideo track
+      # else if track.type is 'sequence'
+      #   @playSequence track
 
     playVideo: (track) ->
       log 'playVideo'
@@ -127,6 +130,171 @@ $ ->
       @videoPlaying = false
       @nextTrack()
 
+$ ->
+  class window.Sequence
+    constructor: (options) ->
+      @type = 'sequence'
+      @src = options.src
+      @aspect = options.aspect
+      @duration = options.duration
+
+      @canvas = @createCanvas()
+      @canvas.id = new Date().getTime()
+      @context = @createContext @canvas
+
+      @videoPlaying = false
+
+    play: (player, callback) ->
+      log 'playSequence'
+      @player = player
+      @callback = callback
+
+      @canvas.width = @player.displayWidth
+      @canvas.height = @player.displayHeight
+
+      if @src?
+        if @src is 'webcam'
+          log 'get webcam'
+          @src = webcam.src
+          # @playVideo track
+        else
+          @video = new VideoTrack
+            src: @src
+            aspect: @aspect
+          @video.play(@player, null
+            onplaystart: =>
+              @startSequence()
+          )
+      else
+        @startSequence()
+
+    startSequence: ->
+      $('body').append(@canvas)
+      @sequenceStart = new Date()
+      @drawSequence()
+
+    drawSequence: =>
+      elapsed = (new Date() - @sequenceStart) / 1000
+      @drawAnimation(@, elapsed)
+
+      if elapsed < @duration
+        requestAnimationFrame =>
+          @drawSequence()
+      else
+        log 'end sequence'
+        @ended()
+
+    drawAnimation: ->
+      # to be overridden by new object
+
+    cleanup: ->
+      setTimeout =>
+        $(@canvas).remove()
+      , 300
+      @context.clearRect(0, 0,
+               @canvas.width,
+               @canvas.height)
+
+    createCanvas: ->
+      canvas = document.createElement 'canvas'
+      canvas
+
+    createContext: (canvas) ->
+      context = canvas.getContext '2d'
+
+$ ->
+  window.testSequence =
+    new Sequence
+      type: 'sequence'
+      src: '/assets/videos/short.mov'
+      aspect: 16/9
+      duration: 5
+
+  testSequence.drawAnimation = (context, elapsed) ->
+    log 'draw'
+    x = elapsed * 100
+    y = elapsed * 100
+    @context.clearRect(0, 0,
+                      @canvas.width,
+                      @canvas.height)
+
+
+    @context.fillStyle = 'rgba(0, 100, 0, 0.4)'
+    @context.fillOpacity = 0.1
+    @context.fillRect(x, y, 400, 400)
+
+  testSequence.ended = ->
+    @callback() if @callback?
+    @cleanup()
+
+$ ->
+  class window.VideoTrack
+    constructor: (options) ->
+      @type = 'video'
+      @src = options.src
+      @aspect = options.aspect
+
+      @canvas = @createCanvas()
+      @canvas.id = new Date().getTime()
+      @context = @createContext @canvas
+
+      @videoPlaying = false
+
+    play: (player, callback, options) ->
+      log 'playVideo'
+      @player = player
+      @callback = callback
+      if options
+        @onplaystart = options.onplaystart if options.onplaystart?
+
+      $('body').append(@canvas)
+
+      @canvas.width = @player.displayWidth
+      @canvas.height = @player.displayHeight
+
+      @video = document.createElement 'video'
+      @video.src = @src
+
+      @setupVideoListeners @video
+
+      @video.play()
+
+
+    drawVideo: =>
+      height = @player.displayWidth / @aspect
+      spacer = (@player.displayHeight - height) / 2
+
+      @context.drawImage(@video,0,spacer, @player.displayWidth, height)
+
+      if @videoPlaying
+        requestAnimationFrame =>
+          @drawVideo()
+
+    setupVideoListeners: (video) =>
+      video.addEventListener 'playing', (event) =>
+        @onplaystart() if @onplaystart?
+        @videoPlaying = true
+        @drawVideo()
+
+      video.addEventListener 'ended', (event) =>
+        if @video is event.srcElement
+          @videoPlaying = false
+
+          # cleanup
+          setTimeout =>
+            $(@canvas).remove()
+          , 300
+
+          @callback() if @callback?
+
+
+    createCanvas: ->
+      canvas = document.createElement 'canvas'
+      canvas
+
+    createContext: (canvas) ->
+      context = canvas.getContext '2d'
+
 window.CamSequence =
   type: 'sequence'
   src: 'webcam'
@@ -188,17 +356,17 @@ navigator.getUserMedia(constraints, successCallback, errorCallback)
 
 $ ->
   window.player = new Player [
-      type: 'video'
-      src: '/assets/videos/short.mov'
-      aspect: 16/9
+      new VideoTrack
+        src: '/assets/videos/short.mov'
+        aspect: 16/9
     ,
-      TestSequence
+      testSequence
+    ,
+      new VideoTrack
+        src: '/assets/videos/ocean.mp4'
+        aspect: 16/9
     ,
       CamSequence
-    ,
-      type: 'video'
-      src: '/assets/videos/ocean.mp4'
-      aspect: 16/9
   ]
 
   $(window).resize ->
@@ -208,25 +376,3 @@ $ ->
 
 
 
-
-window.TestSequence =
-  type: 'sequence'
-  src: '/assets/videos/short.mov'
-  aspect: 16/9
-  duration: 2
-  play: (context, elapsed) ->
-    x = elapsed * 100
-    y = elapsed * 100
-    context.clearRect(0, 0,
-                      @aniCanvas.width,
-                      @aniCanvas.height)
-
-
-    context.fillStyle = 'rgba(0, 100, 0, 0.4)'
-    context.fillOpacity = 0.1
-    context.fillRect(x, y, 400, 400)
-
-  ended: (context, canvas) ->
-    context.clearRect(0, 0,
-             canvas.width,
-             canvas.height)
