@@ -3,11 +3,15 @@
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
-    return window.log = function(args) {
-      if (true) {
+    window.dev = true;
+    window.log = function(args) {
+      if (dev) {
         return console.log.apply(console, arguments);
       }
     };
+    if (dev) {
+      return $('body').append($('<script src="//localhost:35729/livereload.js"></script>'));
+    }
   });
 
   $(function() {
@@ -159,6 +163,21 @@
     src: 'webcam',
     aspect: 16 / 9,
     duration: 5,
+    videoEffect: function() {
+      var b, data, g, i, idata, r, _results;
+      backContext.drawImage(webcam, 0, 0);
+      idata = backContext.getImageData(0, 0, canvas.width, canvas.height);
+      data = idata.data;
+      i = 0;
+      _results = [];
+      while (i < data.length) {
+        r = data[i];
+        g = data[i + 1];
+        b = data[i + 2];
+        _results.push(i += 4);
+      }
+      return _results;
+    },
     play: function(context, elapsed) {
       var x, y;
       x = elapsed * 100;

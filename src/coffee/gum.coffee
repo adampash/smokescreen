@@ -1,4 +1,3 @@
-
 # GET USER MEDIA
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia
 

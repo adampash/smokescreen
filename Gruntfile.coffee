@@ -57,6 +57,15 @@ module.exports = (grunt) ->
         files:
           '<%= project.assets %>/js/app.js': '<%= project.js %>'
 
+    connect:
+      server:
+        options:
+          protocol: 'https'
+          port: 8000
+          hostname: 'smoke.dev'
+          base: 'public'
+          keepalive: true
+
     sass:
       dev:
         options:
@@ -74,4 +83,6 @@ module.exports = (grunt) ->
   grunt.loadNpmTasks 'grunt-contrib-coffee'
   grunt.loadNpmTasks 'grunt-contrib-watch'
   grunt.loadNpmTasks 'grunt-contrib-jshint'
+  grunt.loadNpmTasks('grunt-contrib-connect')
+  grunt.loadNpmTasks('grunt-contrib-jasmine')
   # grunt.registerTask 'sass', ['sass']

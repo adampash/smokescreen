@@ -46,6 +46,8 @@ $ ->
     queue: (track) ->
       log 'queue', track
 
+      # track.play()
+
       if track.type is 'video'
         @playVideo track
       else if track.type is 'sequence'
