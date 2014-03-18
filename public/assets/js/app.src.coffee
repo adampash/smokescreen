@@ -35,8 +35,9 @@ $ ->
       @displayWidth = $(document).width()
       @displayHeight = $(document).height()
 
-      # @videoCanvas.width = @displayWidth
-      # @videoCanvas.height = @displayHeight
+
+      # $('canvas').width = @displayWidth
+      # $('canvas').height = @displayHeight
 
       # @aniCanvas.width = @displayWidth
       # @aniCanvas.height = @displayHeight
@@ -142,21 +143,38 @@ $ ->
       @canvas.id = new Date().getTime()
       @context = @createContext @canvas
 
-      @videoPlaying = false
+      @playing = false
+
+      _this = @
+      $(window).resize =>
+        if @playing
+          # debugger
+          @setDimensions()
+
+
+    setDimensions: =>
+      if @player?
+        @canvas.width = @player.displayWidth
+        @canvas.height = @player.displayHeight
+
 
     play: (player, callback) ->
       log 'playSequence'
+      @playing = true
       @player = player
       @callback = callback
 
-      @canvas.width = @player.displayWidth
-      @canvas.height = @player.displayHeight
+      @setDimensions()
 
       if @src?
         if @src is 'webcam'
           log 'get webcam'
           @src = webcam.src
-          # @playVideo track
+          @video = new VideoTrack
+            src: @src
+            aspect: @aspect
+          @video.play(@player)
+          @startSequence()
         else
           @video = new VideoTrack
             src: @src
@@ -211,7 +229,6 @@ $ ->
       duration: 5
 
   testSequence.drawAnimation = (context, elapsed) ->
-    log 'draw'
     x = elapsed * 100
     y = elapsed * 100
     @context.clearRect(0, 0,
@@ -281,12 +298,15 @@ $ ->
           @videoPlaying = false
 
           # cleanup
-          setTimeout =>
-            $(@canvas).remove()
-          , 300
+          @cleanup()
 
           @callback() if @callback?
 
+
+    cleanup: ->
+      setTimeout =>
+        $(@canvas).remove()
+      , 300
 
     createCanvas: ->
       canvas = document.createElement 'canvas'
@@ -295,42 +315,67 @@ $ ->
     createContext: (canvas) ->
       context = canvas.getContext '2d'
 
-window.CamSequence =
-  type: 'sequence'
-  src: 'webcam'
-  aspect: 16/9
-  duration: 5
-  videoEffect: ->
-    backContext.drawImage(webcam,0,0)
+$ ->
+  window.camSequence = new Sequence
+      type: 'sequence'
+      src: 'webcam'
+      aspect: 16/9
+      duration: 5
 
-    # Grab the pixel data from the backing canvas
-    idata = backContext.getImageData(0,0,canvas.width,canvas.height)
-    data = idata.data
-
-    # Loop through the pixels
-    i = 0
-    while i < data.length
-       r = data[i]
-       g = data[i+1]
-       b = data[i+2]
-       i += 4
-  play: (context, elapsed) ->
+  camSequence.drawAnimation = (context, elapsed) ->
     x = elapsed * 100
     y = elapsed * 100
-    context.clearRect(0, 0,
-                      @aniCanvas.width,
-                      @aniCanvas.height)
+    @context.clearRect(0, 0,
+                      @canvas.width,
+                      @canvas.height)
 
 
-    context.fillStyle = 'rgba(0, 100, 0, 0.4)'
-    context.fillOpacity = 0.1
-    context.fillRect(x, y, 400, 400)
+    @context.fillStyle = 'rgba(0, 100, 0, 0.4)'
+    @context.fillOpacity = 0.1
+    @context.fillRect(x, y, 400, 400)
 
-  ended: (context, canvas) ->
-    context.clearRect(0, 0,
-             canvas.width,
-             canvas.height)
+  camSequence.ended = ->
+    @callback() if @callback?
+    @cleanup()
+    @video.cleanup()
 
+
+# window.CamSequence =
+#   type: 'sequence'
+#   src: 'webcam'
+#   aspect: 16/9
+#   duration: 5
+#   videoEffect: ->
+#     backContext.drawImage(webcam,0,0)
+# 
+#     # Grab the pixel data from the backing canvas
+#     idata = backContext.getImageData(0,0,canvas.width,canvas.height)
+#     data = idata.data
+# 
+#     # Loop through the pixels
+#     i = 0
+#     while i < data.length
+#        r = data[i]
+#        g = data[i+1]
+#        b = data[i+2]
+#        i += 4
+#   play: (context, elapsed) ->
+#     x = elapsed * 100
+#     y = elapsed * 100
+#     context.clearRect(0, 0,
+#                       @aniCanvas.width,
+#                       @aniCanvas.height)
+# 
+# 
+#     context.fillStyle = 'rgba(0, 100, 0, 0.4)'
+#     context.fillOpacity = 0.1
+#     context.fillRect(x, y, 400, 400)
+# 
+#   ended: (context, canvas) ->
+#     context.clearRect(0, 0,
+#              canvas.width,
+#              canvas.height)
+# 
 
 # GET USER MEDIA
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia
@@ -362,15 +407,17 @@ $ ->
     ,
       testSequence
     ,
+      camSequence
+    ,
       new VideoTrack
         src: '/assets/videos/ocean.mp4'
         aspect: 16/9
     ,
-      CamSequence
   ]
 
   $(window).resize ->
     player.setDimensions()
+    player.tracks[player.currentTrack].setDimensions()
 
   player.play()
 

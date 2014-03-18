@@ -7,7 +7,6 @@ $ ->
       duration: 5
 
   testSequence.drawAnimation = (context, elapsed) ->
-    log 'draw'
     x = elapsed * 100
     y = elapsed * 100
     @context.clearRect(0, 0,

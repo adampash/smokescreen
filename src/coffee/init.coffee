@@ -6,15 +6,17 @@ $ ->
     ,
       testSequence
     ,
+      camSequence
+    ,
       new VideoTrack
         src: '/assets/videos/ocean.mp4'
         aspect: 16/9
     ,
-      CamSequence
   ]
 
   $(window).resize ->
     player.setDimensions()
+    player.tracks[player.currentTrack].setDimensions()
 
   player.play()
 

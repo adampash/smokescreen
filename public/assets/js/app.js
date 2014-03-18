@@ -153,6 +153,8 @@
     return window.Sequence = (function() {
       function Sequence(options) {
         this.drawSequence = __bind(this.drawSequence, this);
+        this.setDimensions = __bind(this.setDimensions, this);
+        var _this;
         this.type = 'sequence';
         this.src = options.src;
         this.aspect = options.aspect;
@@ -160,19 +162,40 @@
         this.canvas = this.createCanvas();
         this.canvas.id = new Date().getTime();
         this.context = this.createContext(this.canvas);
-        this.videoPlaying = false;
+        this.playing = false;
+        _this = this;
+        $(window).resize((function(_this) {
+          return function() {
+            if (_this.playing) {
+              return _this.setDimensions();
+            }
+          };
+        })(this));
       }
+
+      Sequence.prototype.setDimensions = function() {
+        if (this.player != null) {
+          this.canvas.width = this.player.displayWidth;
+          return this.canvas.height = this.player.displayHeight;
+        }
+      };
 
       Sequence.prototype.play = function(player, callback) {
         log('playSequence');
+        this.playing = true;
         this.player = player;
         this.callback = callback;
-        this.canvas.width = this.player.displayWidth;
-        this.canvas.height = this.player.displayHeight;
+        this.setDimensions();
         if (this.src != null) {
           if (this.src === 'webcam') {
             log('get webcam');
-            return this.src = webcam.src;
+            this.src = webcam.src;
+            this.video = new VideoTrack({
+              src: this.src,
+              aspect: this.aspect
+            });
+            this.video.play(this.player);
+            return this.startSequence();
           } else {
             this.video = new VideoTrack({
               src: this.src,
@@ -249,7 +272,6 @@
     });
     testSequence.drawAnimation = function(context, elapsed) {
       var x, y;
-      log('draw');
       x = elapsed * 100;
       y = elapsed * 100;
       this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -325,15 +347,21 @@
           return function(event) {
             if (_this.video === event.srcElement) {
               _this.videoPlaying = false;
-              setTimeout(function() {
-                return $(_this.canvas).remove();
-              }, 300);
+              _this.cleanup();
               if (_this.callback != null) {
                 return _this.callback();
               }
             }
           };
         })(this));
+      };
+
+      VideoTrack.prototype.cleanup = function() {
+        return setTimeout((function(_this) {
+          return function() {
+            return $(_this.canvas).remove();
+          };
+        })(this), 300);
       };
 
       VideoTrack.prototype.createCanvas = function() {
@@ -352,39 +380,30 @@
     })();
   });
 
-  window.CamSequence = {
-    type: 'sequence',
-    src: 'webcam',
-    aspect: 16 / 9,
-    duration: 5,
-    videoEffect: function() {
-      var b, data, g, i, idata, r, _results;
-      backContext.drawImage(webcam, 0, 0);
-      idata = backContext.getImageData(0, 0, canvas.width, canvas.height);
-      data = idata.data;
-      i = 0;
-      _results = [];
-      while (i < data.length) {
-        r = data[i];
-        g = data[i + 1];
-        b = data[i + 2];
-        _results.push(i += 4);
-      }
-      return _results;
-    },
-    play: function(context, elapsed) {
+  $(function() {
+    window.camSequence = new Sequence({
+      type: 'sequence',
+      src: 'webcam',
+      aspect: 16 / 9,
+      duration: 5
+    });
+    camSequence.drawAnimation = function(context, elapsed) {
       var x, y;
       x = elapsed * 100;
       y = elapsed * 100;
-      context.clearRect(0, 0, this.aniCanvas.width, this.aniCanvas.height);
-      context.fillStyle = 'rgba(0, 100, 0, 0.4)';
-      context.fillOpacity = 0.1;
-      return context.fillRect(x, y, 400, 400);
-    },
-    ended: function(context, canvas) {
-      return context.clearRect(0, 0, canvas.width, canvas.height);
-    }
-  };
+      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.context.fillStyle = 'rgba(0, 100, 0, 0.4)';
+      this.context.fillOpacity = 0.1;
+      return this.context.fillRect(x, y, 400, 400);
+    };
+    return camSequence.ended = function() {
+      if (this.callback != null) {
+        this.callback();
+      }
+      this.cleanup();
+      return this.video.cleanup();
+    };
+  });
 
   navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
@@ -418,13 +437,14 @@
       new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }), testSequence, new VideoTrack({
+      }), testSequence, camSequence, new VideoTrack({
         src: '/assets/videos/ocean.mp4',
         aspect: 16 / 9
-      }), CamSequence
+      })
     ]);
     $(window).resize(function() {
-      return player.setDimensions();
+      player.setDimensions();
+      return player.tracks[player.currentTrack].setDimensions();
     });
     return player.play();
   });

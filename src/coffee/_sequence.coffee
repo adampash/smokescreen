@@ -10,21 +10,38 @@ $ ->
       @canvas.id = new Date().getTime()
       @context = @createContext @canvas
 
-      @videoPlaying = false
+      @playing = false
+
+      _this = @
+      $(window).resize =>
+        if @playing
+          # debugger
+          @setDimensions()
+
+
+    setDimensions: =>
+      if @player?
+        @canvas.width = @player.displayWidth
+        @canvas.height = @player.displayHeight
+
 
     play: (player, callback) ->
       log 'playSequence'
+      @playing = true
       @player = player
       @callback = callback
 
-      @canvas.width = @player.displayWidth
-      @canvas.height = @player.displayHeight
+      @setDimensions()
 
       if @src?
         if @src is 'webcam'
           log 'get webcam'
           @src = webcam.src
-          # @playVideo track
+          @video = new VideoTrack
+            src: @src
+            aspect: @aspect
+          @video.play(@player)
+          @startSequence()
         else
           @video = new VideoTrack
             src: @src

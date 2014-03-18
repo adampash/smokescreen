@@ -26,8 +26,9 @@ $ ->
       @displayWidth = $(document).width()
       @displayHeight = $(document).height()
 
-      # @videoCanvas.width = @displayWidth
-      # @videoCanvas.height = @displayHeight
+
+      # $('canvas').width = @displayWidth
+      # $('canvas').height = @displayHeight
 
       # @aniCanvas.width = @displayWidth
       # @aniCanvas.height = @displayHeight

@@ -52,12 +52,15 @@ $ ->
           @videoPlaying = false
 
           # cleanup
-          setTimeout =>
-            $(@canvas).remove()
-          , 300
+          @cleanup()
 
           @callback() if @callback?
 
+
+    cleanup: ->
+      setTimeout =>
+        $(@canvas).remove()
+      , 300
 
     createCanvas: ->
       canvas = document.createElement 'canvas'
