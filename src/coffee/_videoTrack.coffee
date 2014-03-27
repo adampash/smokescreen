@@ -20,8 +20,7 @@ $ ->
 
       $('body').append(@canvas)
 
-      @canvas.width = @player.displayWidth
-      @canvas.height = @player.displayHeight
+      @setDimensions()
 
       @video = document.createElement 'video'
       @video.src = @src
@@ -29,6 +28,12 @@ $ ->
       @setupVideoListeners @video
 
       @video.play()
+
+
+    setDimensions: ->
+      if @player?
+        @canvas.width = @player.displayWidth
+        @canvas.height = @player.displayHeight
 
 
     drawVideo: =>

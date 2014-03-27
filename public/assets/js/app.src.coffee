@@ -13,35 +13,13 @@ $ ->
       @currentTrack = 0
       @videoPlaying = false
 
-      # @videoCanvas = @createCanvas()
-      # @videoContext = @createContext @videoCanvas
-
-      # @aniCanvas = @createCanvas()
-      # @aniContext = @createContext @aniCanvas
-
       @setDimensions()
-
-      # $('body').append(@videoCanvas)
-      # $('body').append(@aniCanvas)
-
-    createCanvas: ->
-      canvas = document.createElement 'canvas'
-      canvas
-
-    createContext: (canvas) ->
-      context = canvas.getContext '2d'
 
     setDimensions: (canvas) ->
       @displayWidth = $(document).width()
       @displayHeight = $(document).height()
 
-
-      # $('canvas').width = @displayWidth
-      # $('canvas').height = @displayHeight
-
-      # @aniCanvas.width = @displayWidth
-      # @aniCanvas.height = @displayHeight
-
+      @tracks[@currentTrack].setDimensions()
 
     play: ->
       log 'play'
@@ -57,79 +35,8 @@ $ ->
 
       track.play(
         @, =>
-          log 'callback'
           @nextTrack()
       )
-
-      # if track.type is 'video'
-      #   @playVideo track
-      # else if track.type is 'sequence'
-      #   @playSequence track
-
-    playVideo: (track) ->
-      log 'playVideo'
-
-      @video = document.createElement 'video'
-      @video.src = track.src
-
-      @setupVideoListeners @video, track
-
-      # $('body').append(@video)
-
-      @videoPlaying = true
-      @video.play()
-
-      @drawVideo(track)
-
-    playSequence: (track) ->
-      log 'playSequence'
-
-      @sequenceStart = new Date()
-
-      if track.src?
-        if track.src is 'webcam'
-          log 'get webcam'
-          track.src = webcam.src
-          @playVideo track
-        else
-          @playVideo track
-      else
-        @drawSequence track
-
-    drawSequence: (track) =>
-      elapsed = (new Date() - @sequenceStart) / 1000
-      track.play.call(@, @aniContext, elapsed)
-
-      if elapsed < track.duration
-        requestAnimationFrame =>
-          @drawSequence track
-      else
-        log 'end sequence'
-        track.ended.call(@, @aniContext, @aniCanvas)
-        @nextTrack()
-
-    drawVideo: (track) =>
-      height = @displayWidth / track.aspect
-      spacer = (@displayHeight - height) / 2
-      @videoContext.drawImage(@video,0,spacer, @displayWidth, height)
-      if @videoPlaying
-        requestAnimationFrame =>
-          @drawVideo track
-
-
-    setupVideoListeners: (video, track) =>
-      video.addEventListener 'ended', (event) =>
-        if @video is event.srcElement
-          @videoEnded()
-
-      if track.type is 'sequence'
-        video.addEventListener 'playing', =>
-          @drawSequence track
-
-    videoEnded: ->
-      log 'ended'
-      @videoPlaying = false
-      @nextTrack()
 
 $ ->
   class window.Sequence
@@ -143,6 +50,9 @@ $ ->
       @canvas.id = new Date().getTime()
       @context = @createContext @canvas
 
+      @canvases = []
+      @canvases.push @canvas
+
       @playing = false
 
       _this = @
@@ -154,8 +64,11 @@ $ ->
 
     setDimensions: =>
       if @player?
-        @canvas.width = @player.displayWidth
-        @canvas.height = @player.displayHeight
+        @canvases.map (canvas) ->
+          canvas.width = @player.displayWidth
+          canvas.height = @player.displayHeight
+        if @video
+          @video.setDimensions()
 
 
     play: (player, callback) ->
@@ -175,6 +88,7 @@ $ ->
             aspect: @aspect
           @video.play(@player)
           @startSequence()
+          @canvases.push @video
         else
           @video = new VideoTrack
             src: @src
@@ -266,8 +180,7 @@ $ ->
 
       $('body').append(@canvas)
 
-      @canvas.width = @player.displayWidth
-      @canvas.height = @player.displayHeight
+      @setDimensions()
 
       @video = document.createElement 'video'
       @video.src = @src
@@ -275,6 +188,12 @@ $ ->
       @setupVideoListeners @video
 
       @video.play()
+
+
+    setDimensions: ->
+      if @player?
+        @canvas.width = @player.displayWidth
+        @canvas.height = @player.displayHeight
 
 
     drawVideo: =>
@@ -417,7 +336,7 @@ $ ->
 
   $(window).resize ->
     player.setDimensions()
-    player.tracks[player.currentTrack].setDimensions()
+    # player.tracks[player.currentTrack].setDimensions()
 
   player.play()
 

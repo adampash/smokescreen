@@ -16,7 +16,7 @@ $ ->
 
   $(window).resize ->
     player.setDimensions()
-    player.tracks[player.currentTrack].setDimensions()
+    # player.tracks[player.currentTrack].setDimensions()
 
   player.play()
 

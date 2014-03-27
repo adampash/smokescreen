@@ -1,2 +1,2 @@
-/*web: rvmsudo tunnels*/
+web: rvmsudo tunnels
 grunt: grunt watch

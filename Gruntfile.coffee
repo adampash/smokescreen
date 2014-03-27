@@ -85,4 +85,3 @@ module.exports = (grunt) ->
   grunt.loadNpmTasks 'grunt-contrib-jshint'
   grunt.loadNpmTasks('grunt-contrib-connect')
   grunt.loadNpmTasks('grunt-contrib-jasmine')
-  # grunt.registerTask 'sass', ['sass']

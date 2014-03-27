@@ -18,28 +18,15 @@
     return window.Player = (function() {
       function Player(tracks) {
         this.tracks = tracks;
-        this.setupVideoListeners = __bind(this.setupVideoListeners, this);
-        this.drawVideo = __bind(this.drawVideo, this);
-        this.drawSequence = __bind(this.drawSequence, this);
         this.currentTrack = 0;
         this.videoPlaying = false;
         this.setDimensions();
       }
 
-      Player.prototype.createCanvas = function() {
-        var canvas;
-        canvas = document.createElement('canvas');
-        return canvas;
-      };
-
-      Player.prototype.createContext = function(canvas) {
-        var context;
-        return context = canvas.getContext('2d');
-      };
-
       Player.prototype.setDimensions = function(canvas) {
         this.displayWidth = $(document).width();
-        return this.displayHeight = $(document).height();
+        this.displayHeight = $(document).height();
+        return this.tracks[this.currentTrack].setDimensions();
       };
 
       Player.prototype.play = function() {
@@ -58,90 +45,9 @@
         log('queue', track);
         return track.play(this, (function(_this) {
           return function() {
-            log('callback');
             return _this.nextTrack();
           };
         })(this));
-      };
-
-      Player.prototype.playVideo = function(track) {
-        log('playVideo');
-        this.video = document.createElement('video');
-        this.video.src = track.src;
-        this.setupVideoListeners(this.video, track);
-        this.videoPlaying = true;
-        this.video.play();
-        return this.drawVideo(track);
-      };
-
-      Player.prototype.playSequence = function(track) {
-        log('playSequence');
-        this.sequenceStart = new Date();
-        if (track.src != null) {
-          if (track.src === 'webcam') {
-            log('get webcam');
-            track.src = webcam.src;
-            return this.playVideo(track);
-          } else {
-            return this.playVideo(track);
-          }
-        } else {
-          return this.drawSequence(track);
-        }
-      };
-
-      Player.prototype.drawSequence = function(track) {
-        var elapsed;
-        elapsed = (new Date() - this.sequenceStart) / 1000;
-        track.play.call(this, this.aniContext, elapsed);
-        if (elapsed < track.duration) {
-          return requestAnimationFrame((function(_this) {
-            return function() {
-              return _this.drawSequence(track);
-            };
-          })(this));
-        } else {
-          log('end sequence');
-          track.ended.call(this, this.aniContext, this.aniCanvas);
-          return this.nextTrack();
-        }
-      };
-
-      Player.prototype.drawVideo = function(track) {
-        var height, spacer;
-        height = this.displayWidth / track.aspect;
-        spacer = (this.displayHeight - height) / 2;
-        this.videoContext.drawImage(this.video, 0, spacer, this.displayWidth, height);
-        if (this.videoPlaying) {
-          return requestAnimationFrame((function(_this) {
-            return function() {
-              return _this.drawVideo(track);
-            };
-          })(this));
-        }
-      };
-
-      Player.prototype.setupVideoListeners = function(video, track) {
-        video.addEventListener('ended', (function(_this) {
-          return function(event) {
-            if (_this.video === event.srcElement) {
-              return _this.videoEnded();
-            }
-          };
-        })(this));
-        if (track.type === 'sequence') {
-          return video.addEventListener('playing', (function(_this) {
-            return function() {
-              return _this.drawSequence(track);
-            };
-          })(this));
-        }
-      };
-
-      Player.prototype.videoEnded = function() {
-        log('ended');
-        this.videoPlaying = false;
-        return this.nextTrack();
       };
 
       return Player;
@@ -162,6 +68,8 @@
         this.canvas = this.createCanvas();
         this.canvas.id = new Date().getTime();
         this.context = this.createContext(this.canvas);
+        this.canvases = [];
+        this.canvases.push(this.canvas);
         this.playing = false;
         _this = this;
         $(window).resize((function(_this) {
@@ -175,8 +83,13 @@
 
       Sequence.prototype.setDimensions = function() {
         if (this.player != null) {
-          this.canvas.width = this.player.displayWidth;
-          return this.canvas.height = this.player.displayHeight;
+          this.canvases.map(function(canvas) {
+            canvas.width = this.player.displayWidth;
+            return canvas.height = this.player.displayHeight;
+          });
+          if (this.video) {
+            return this.video.setDimensions();
+          }
         }
       };
 
@@ -195,7 +108,8 @@
               aspect: this.aspect
             });
             this.video.play(this.player);
-            return this.startSequence();
+            this.startSequence();
+            return this.canvases.push(this.video);
           } else {
             this.video = new VideoTrack({
               src: this.src,
@@ -311,12 +225,18 @@
           }
         }
         $('body').append(this.canvas);
-        this.canvas.width = this.player.displayWidth;
-        this.canvas.height = this.player.displayHeight;
+        this.setDimensions();
         this.video = document.createElement('video');
         this.video.src = this.src;
         this.setupVideoListeners(this.video);
         return this.video.play();
+      };
+
+      VideoTrack.prototype.setDimensions = function() {
+        if (this.player != null) {
+          this.canvas.width = this.player.displayWidth;
+          return this.canvas.height = this.player.displayHeight;
+        }
       };
 
       VideoTrack.prototype.drawVideo = function() {
@@ -443,8 +363,7 @@
       })
     ]);
     $(window).resize(function() {
-      player.setDimensions();
-      return player.tracks[player.currentTrack].setDimensions();
+      return player.setDimensions();
     });
     return player.play();
   });

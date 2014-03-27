@@ -10,6 +10,9 @@ $ ->
       @canvas.id = new Date().getTime()
       @context = @createContext @canvas
 
+      @canvases = []
+      @canvases.push @canvas
+
       @playing = false
 
       _this = @
@@ -21,8 +24,11 @@ $ ->
 
     setDimensions: =>
       if @player?
-        @canvas.width = @player.displayWidth
-        @canvas.height = @player.displayHeight
+        @canvases.map (canvas) ->
+          canvas.width = @player.displayWidth
+          canvas.height = @player.displayHeight
+        if @video
+          @video.setDimensions()
 
 
     play: (player, callback) ->
@@ -42,6 +48,7 @@ $ ->
             aspect: @aspect
           @video.play(@player)
           @startSequence()
+          @canvases.push @video
         else
           @video = new VideoTrack
             src: @src
