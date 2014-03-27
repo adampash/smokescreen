@@ -11,6 +11,13 @@ $ ->
 
       @videoPlaying = false
 
+      if options.littleCanvas?
+        @littleCanvas = @createCanvas()
+        @littleCanvas.width = 480
+        @littleCanvas.height = 320
+        @littleContext = @createContext @littleCanvas
+
+
     play: (player, callback, options) ->
       log 'playVideo'
       @player = player
@@ -18,7 +25,7 @@ $ ->
       if options
         @onplaystart = options.onplaystart if options.onplaystart?
 
-      $('body').append(@canvas)
+      $('body').prepend(@canvas)
 
       @setDimensions()
 
@@ -41,6 +48,9 @@ $ ->
       spacer = (@player.displayHeight - height) / 2
 
       @context.drawImage(@video,0,spacer, @player.displayWidth, height)
+      if @littleCanvas?
+        @littleContext.drawImage(@video,0,0, @littleCanvas.width, @littleCanvas.height);
+
 
       if @videoPlaying
         requestAnimationFrame =>

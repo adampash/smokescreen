@@ -21,6 +21,24 @@ class window.Converter
     @uploadedSprite = null
     @save = false
 
+  convertAndUpload: ->
+    if !@convertingFrames?
+      @convertingFrames = @frames
+      @startedAt = new Date().getTime()
+
+    if @convertingFrames.length > 0
+      # log @convertingFrames.length if @convertingFrames.length%20==0
+      file = @convertFrame(@convertingFrames.shift())
+      @postImage(file,
+       success: (response) =>
+        window.faces.push response
+        @convertAndUpload()
+      )
+    else
+      log 'All done converting and uploading frames'
+      log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
+      alert 'DONE'
+
   convert: ->
     @files = []
     @files.push(@convertFrame(frame)) for frame in @frames
@@ -80,17 +98,52 @@ class window.Converter
   # 2) postPNGs
   # 3) atiwl.uploadToS3
 
+  postImage: (file, options) ->
+    options = options || {}
+    formdata = new FormData()
+    formdata.append("upload", file)
+
+    $.ajax
+      url: "http://localhost:3000/"
+      type: "POST"
+      data: formdata
+      processData: false
+      # contentType: false
+      contentType: false
+      xhrFields:
+        withCredentials: false
+      xhr: ->
+        req = $.ajaxSettings.xhr()
+        if (req)
+          if options.progress
+            req.upload.addEventListener('progress', (event) ->
+              if event.lengthComputable
+                options.progress(event)
+            , false)
+        req
+    .done (response) =>
+      if options.success
+        options.success(response)
+    .always ->
+      if options.complete
+        options.complete()
+    .fail ->
+      if options.error
+        options.error()
+
   postPNGs: (options) ->
     for file, index in @files
       @formdata.append("upload[" + index + "]", file)
     # @formdata.append("sprite", @uploadedSprite)
 
     $.ajax
-      url: "http://smokescreen.dev:5000/"
+      url: "http://localhost:3000/"
       type: "POST"
       data: @formdata
       processData: false
-      contentType: false
+      contentType: 'text/plain'
+      xhrFields:
+        withCredentials: false
       xhr: ->
         req = $.ajaxSettings.xhr()
         if (req)

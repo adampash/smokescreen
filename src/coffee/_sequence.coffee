@@ -48,6 +48,7 @@ $ ->
           @video = new VideoTrack
             src: @src
             aspect: @aspect
+            littleCanvas: true
           @video.play(@player)
           @startSequence()
           @canvases.push @video

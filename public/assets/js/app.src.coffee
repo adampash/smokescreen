@@ -88,6 +88,7 @@ $ ->
           @video = new VideoTrack
             src: @src
             aspect: @aspect
+            littleCanvas: true
           @video.play(@player)
           @startSequence()
           @canvases.push @video
@@ -178,6 +179,13 @@ $ ->
 
       @videoPlaying = false
 
+      if options.littleCanvas?
+        @littleCanvas = @createCanvas()
+        @littleCanvas.width = 480
+        @littleCanvas.height = 320
+        @littleContext = @createContext @littleCanvas
+
+
     play: (player, callback, options) ->
       log 'playVideo'
       @player = player
@@ -185,7 +193,7 @@ $ ->
       if options
         @onplaystart = options.onplaystart if options.onplaystart?
 
-      $('body').append(@canvas)
+      $('body').prepend(@canvas)
 
       @setDimensions()
 
@@ -208,6 +216,9 @@ $ ->
       spacer = (@player.displayHeight - height) / 2
 
       @context.drawImage(@video,0,spacer, @player.displayWidth, height)
+      if @littleCanvas?
+        @littleContext.drawImage(@video,0,0, @littleCanvas.width, @littleCanvas.height);
+
 
       if @videoPlaying
         requestAnimationFrame =>
@@ -242,13 +253,14 @@ $ ->
       context = canvas.getContext '2d'
 
 $ ->
+  duration = 1
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
       aspect: 16/9
-      duration: 3
+      duration: duration
       onStart: ->
-        @recordCam(3)
+        @recordCam(duration)
 
   camSequence.drawAnimation = (context, elapsed) ->
     x = elapsed * 100
@@ -268,9 +280,14 @@ $ ->
     @video.cleanup()
 
   camSequence.recordCam = (seconds) ->
-    window.recorder = new Recorder @video.canvas
-    recorder.record seconds, 40,
-      complete: =>
+    window.recorder = @record(@video.canvas, seconds)
+    window.littleRecorder = @record(@video.littleCanvas, seconds, true)
+
+  camSequence.record = (canvas, seconds, convert) ->
+    recorder = new Recorder canvas
+
+    if convert
+      complete = =>
         log 'recording complete'
         window.converter = new Converter recorder.canvas,
                             recorder.capturedFrames,
@@ -278,8 +295,15 @@ $ ->
                             null,
                             converted: ->
                               log 'converted'
+        converter.convertAndUpload()
+    else
+      complete = null
 
-        converter.convert()
+    recorder.record seconds, 40,
+      complete: complete
+
+    recorder
+
 
 
 # window.CamSequence =
@@ -403,6 +427,24 @@ class window.Converter
     @uploadedSprite = null
     @save = false
 
+  convertAndUpload: ->
+    if !@convertingFrames?
+      @convertingFrames = @frames
+      @startedAt = new Date().getTime()
+
+    if @convertingFrames.length > 0
+      # log @convertingFrames.length if @convertingFrames.length%20==0
+      file = @convertFrame(@convertingFrames.shift())
+      @postImage(file,
+       success: (response) =>
+        window.faces.push response
+        @convertAndUpload()
+      )
+    else
+      log 'All done converting and uploading frames'
+      log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
+      alert 'DONE'
+
   convert: ->
     @files = []
     @files.push(@convertFrame(frame)) for frame in @frames
@@ -462,17 +504,52 @@ class window.Converter
   # 2) postPNGs
   # 3) atiwl.uploadToS3
 
+  postImage: (file, options) ->
+    options = options || {}
+    formdata = new FormData()
+    formdata.append("upload", file)
+
+    $.ajax
+      url: "http://localhost:3000/"
+      type: "POST"
+      data: formdata
+      processData: false
+      # contentType: false
+      contentType: false
+      xhrFields:
+        withCredentials: false
+      xhr: ->
+        req = $.ajaxSettings.xhr()
+        if (req)
+          if options.progress
+            req.upload.addEventListener('progress', (event) ->
+              if event.lengthComputable
+                options.progress(event)
+            , false)
+        req
+    .done (response) =>
+      if options.success
+        options.success(response)
+    .always ->
+      if options.complete
+        options.complete()
+    .fail ->
+      if options.error
+        options.error()
+
   postPNGs: (options) ->
     for file, index in @files
       @formdata.append("upload[" + index + "]", file)
     # @formdata.append("sprite", @uploadedSprite)
 
     $.ajax
-      url: "http://smokescreen.dev:5000/"
+      url: "http://localhost:3000/"
       type: "POST"
       data: @formdata
       processData: false
-      contentType: false
+      contentType: 'text/plain'
+      xhrFields:
+        withCredentials: false
       xhr: ->
         req = $.ajaxSettings.xhr()
         if (req)
@@ -677,11 +754,12 @@ class window.Recorder
 
 
 $ ->
+  window.faces = []
   window.player = new Player [
       camSequence
     ,
-      playbackCamSequence
-    ,
+    #   playbackCamSequence
+    # ,
       new VideoTrack
         src: '/assets/videos/short.mov'
         aspect: 16/9

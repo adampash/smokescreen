@@ -1,9 +1,10 @@
 $ ->
+  window.faces = []
   window.player = new Player [
       camSequence
     ,
-      playbackCamSequence
-    ,
+    #   playbackCamSequence
+    # ,
       new VideoTrack
         src: '/assets/videos/short.mov'
         aspect: 16/9

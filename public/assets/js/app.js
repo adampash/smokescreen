@@ -109,7 +109,8 @@
             this.src = webcam.src;
             this.video = new VideoTrack({
               src: this.src,
-              aspect: this.aspect
+              aspect: this.aspect,
+              littleCanvas: true
             });
             this.video.play(this.player);
             this.startSequence();
@@ -224,6 +225,12 @@
         this.canvas.id = new Date().getTime();
         this.context = this.createContext(this.canvas);
         this.videoPlaying = false;
+        if (options.littleCanvas != null) {
+          this.littleCanvas = this.createCanvas();
+          this.littleCanvas.width = 480;
+          this.littleCanvas.height = 320;
+          this.littleContext = this.createContext(this.littleCanvas);
+        }
       }
 
       VideoTrack.prototype.play = function(player, callback, options) {
@@ -235,7 +242,7 @@
             this.onplaystart = options.onplaystart;
           }
         }
-        $('body').append(this.canvas);
+        $('body').prepend(this.canvas);
         this.setDimensions();
         this.video = document.createElement('video');
         this.video.src = this.src;
@@ -255,6 +262,9 @@
         height = this.player.displayWidth / this.aspect;
         spacer = (this.player.displayHeight - height) / 2;
         this.context.drawImage(this.video, 0, spacer, this.player.displayWidth, height);
+        if (this.littleCanvas != null) {
+          this.littleContext.drawImage(this.video, 0, 0, this.littleCanvas.width, this.littleCanvas.height);
+        }
         if (this.videoPlaying) {
           return requestAnimationFrame((function(_this) {
             return function() {
@@ -312,13 +322,15 @@
   });
 
   $(function() {
+    var duration;
+    duration = 1;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
       aspect: 16 / 9,
-      duration: 3,
+      duration: duration,
       onStart: function() {
-        return this.recordCam(3);
+        return this.recordCam(duration);
       }
     });
     camSequence.drawAnimation = function(context, elapsed) {
@@ -337,10 +349,15 @@
       this.cleanup();
       return this.video.cleanup();
     };
-    return camSequence.recordCam = function(seconds) {
-      window.recorder = new Recorder(this.video.canvas);
-      return recorder.record(seconds, 40, {
-        complete: (function(_this) {
+    camSequence.recordCam = function(seconds) {
+      window.recorder = this.record(this.video.canvas, seconds);
+      return window.littleRecorder = this.record(this.video.littleCanvas, seconds, true);
+    };
+    return camSequence.record = function(canvas, seconds, convert) {
+      var complete, recorder;
+      recorder = new Recorder(canvas);
+      if (convert) {
+        complete = (function(_this) {
           return function() {
             log('recording complete');
             window.converter = new Converter(recorder.canvas, recorder.capturedFrames, recorder.fps, null, {
@@ -348,10 +365,16 @@
                 return log('converted');
               }
             });
-            return converter.convert();
+            return converter.convertAndUpload();
           };
-        })(this)
+        })(this);
+      } else {
+        complete = null;
+      }
+      recorder.record(seconds, 40, {
+        complete: complete
       });
+      return recorder;
     };
   });
 
@@ -473,6 +496,29 @@
       return this.save = false;
     };
 
+    Converter.prototype.convertAndUpload = function() {
+      var file;
+      if (this.convertingFrames == null) {
+        this.convertingFrames = this.frames;
+        this.startedAt = new Date().getTime();
+      }
+      if (this.convertingFrames.length > 0) {
+        file = this.convertFrame(this.convertingFrames.shift());
+        return this.postImage(file, {
+          success: (function(_this) {
+            return function(response) {
+              window.faces.push(response);
+              return _this.convertAndUpload();
+            };
+          })(this)
+        });
+      } else {
+        log('All done converting and uploading frames');
+        log("Total time took: " + (new Date().getTime() - this.startedAt) / 1000 + 'secs');
+        return alert('DONE');
+      }
+    };
+
     Converter.prototype.convert = function() {
       var frame, _i, _len, _ref;
       this.files = [];
@@ -537,6 +583,51 @@
       }
     };
 
+    Converter.prototype.postImage = function(file, options) {
+      var formdata;
+      options = options || {};
+      formdata = new FormData();
+      formdata.append("upload", file);
+      return $.ajax({
+        url: "http://localhost:3000/",
+        type: "POST",
+        data: formdata,
+        processData: false,
+        contentType: false,
+        xhrFields: {
+          withCredentials: false
+        },
+        xhr: function() {
+          var req;
+          req = $.ajaxSettings.xhr();
+          if (req) {
+            if (options.progress) {
+              req.upload.addEventListener('progress', function(event) {
+                if (event.lengthComputable) {
+                  return options.progress(event);
+                }
+              }, false);
+            }
+          }
+          return req;
+        }
+      }).done((function(_this) {
+        return function(response) {
+          if (options.success) {
+            return options.success(response);
+          }
+        };
+      })(this)).always(function() {
+        if (options.complete) {
+          return options.complete();
+        }
+      }).fail(function() {
+        if (options.error) {
+          return options.error();
+        }
+      });
+    };
+
     Converter.prototype.postPNGs = function(options) {
       var file, index, _i, _len, _ref;
       _ref = this.files;
@@ -545,11 +636,14 @@
         this.formdata.append("upload[" + index + "]", file);
       }
       return $.ajax({
-        url: "http://smokescreen.dev:5000/",
+        url: "http://localhost:3000/",
         type: "POST",
         data: this.formdata,
         processData: false,
-        contentType: false,
+        contentType: 'text/plain',
+        xhrFields: {
+          withCredentials: false
+        },
         xhr: function() {
           var req;
           req = $.ajaxSettings.xhr();
@@ -783,8 +877,9 @@
   })();
 
   $(function() {
+    window.faces = [];
     window.player = new Player([
-      camSequence, playbackCamSequence, new VideoTrack({
+      camSequence, new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
       }), testSequence, new VideoTrack({
