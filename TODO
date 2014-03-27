@@ -1,9 +1,11 @@
 TODO
-* Create sequences
+* Background workers:
+  http://www.html5rocks.com/en/tutorials/workers/basics/
 * Adjust sequence to display size (so, for example, green rectangle scales to video)
 
 
 DONE
+x Create sequences
 x Set up SSL for smokescreen.dev
 x Write script to launch Chrome in fullscreen at smokescreen url
 x Get cam access from the start
