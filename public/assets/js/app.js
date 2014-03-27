@@ -365,7 +365,10 @@
     $(window).resize(function() {
       return player.setDimensions();
     });
-    return player.play();
+    return $(window).on('click', function() {
+      $('h1').remove();
+      return player.play();
+    });
   });
 
 }).call(this);
