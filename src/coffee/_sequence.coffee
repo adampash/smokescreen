@@ -6,19 +6,21 @@ $ ->
       @aspect = options.aspect
       @duration = options.duration
 
+      @onStart = options.onStart if options.onStart?
+
       @canvas = @createCanvas()
       @canvas.id = new Date().getTime()
       @context = @createContext @canvas
 
       @canvases = []
       @canvases.push @canvas
+      $('body').append(@canvas)
 
       @playing = false
 
       _this = @
       $(window).resize =>
         if @playing
-          # debugger
           @setDimensions()
 
 
@@ -49,6 +51,11 @@ $ ->
           @video.play(@player)
           @startSequence()
           @canvases.push @video
+        else if @src is 'CanvasPlayer'
+          @video = new CanvasPlayer @canvas, window.recorder.capturedFrames, window.recorder.fps
+          @video.play(
+            player: @player
+          )
         else
           @video = new VideoTrack
             src: @src
@@ -61,9 +68,9 @@ $ ->
         @startSequence()
 
     startSequence: ->
-      $('body').append(@canvas)
       @sequenceStart = new Date()
       @drawSequence()
+      @onStart() if @onStart?
 
     drawSequence: =>
       elapsed = (new Date() - @sequenceStart) / 1000

@@ -65,11 +65,15 @@
         this.src = options.src;
         this.aspect = options.aspect;
         this.duration = options.duration;
+        if (options.onStart != null) {
+          this.onStart = options.onStart;
+        }
         this.canvas = this.createCanvas();
         this.canvas.id = new Date().getTime();
         this.context = this.createContext(this.canvas);
         this.canvases = [];
         this.canvases.push(this.canvas);
+        $('body').append(this.canvas);
         this.playing = false;
         _this = this;
         $(window).resize((function(_this) {
@@ -110,6 +114,11 @@
             this.video.play(this.player);
             this.startSequence();
             return this.canvases.push(this.video);
+          } else if (this.src === 'CanvasPlayer') {
+            this.video = new CanvasPlayer(this.canvas, window.recorder.capturedFrames, window.recorder.fps);
+            return this.video.play({
+              player: this.player
+            });
           } else {
             this.video = new VideoTrack({
               src: this.src,
@@ -129,9 +138,11 @@
       };
 
       Sequence.prototype.startSequence = function() {
-        $('body').append(this.canvas);
         this.sequenceStart = new Date();
-        return this.drawSequence();
+        this.drawSequence();
+        if (this.onStart != null) {
+          return this.onStart();
+        }
       };
 
       Sequence.prototype.drawSequence = function() {
@@ -305,7 +316,10 @@
       type: 'sequence',
       src: 'webcam',
       aspect: 16 / 9,
-      duration: 5
+      duration: 3,
+      onStart: function() {
+        return this.recordCam(3);
+      }
     });
     camSequence.drawAnimation = function(context, elapsed) {
       var x, y;
@@ -316,14 +330,362 @@
       this.context.fillOpacity = 0.1;
       return this.context.fillRect(x, y, 400, 400);
     };
-    return camSequence.ended = function() {
+    camSequence.ended = function() {
       if (this.callback != null) {
         this.callback();
       }
       this.cleanup();
       return this.video.cleanup();
     };
+    return camSequence.recordCam = function(seconds) {
+      window.recorder = new Recorder(this.video.canvas);
+      return recorder.record(seconds, 40, {
+        complete: (function(_this) {
+          return function() {
+            log('recording complete');
+            window.converter = new Converter(recorder.canvas, recorder.capturedFrames, recorder.fps, null, {
+              converted: function() {
+                return log('converted');
+              }
+            });
+            return converter.convert();
+          };
+        })(this)
+      });
+    };
   });
+
+  window.CanvasPlayer = (function() {
+    function CanvasPlayer(canvas, frames, fps) {
+      this.canvas = canvas;
+      this.frames = frames;
+      this.fps = fps;
+      this.options = {};
+      this.paused = false;
+      this.context = this.canvas.getContext('2d');
+      this.index = 0;
+      this.fps = this.fps || 30;
+      this.loopStyle = 'beginning';
+      this.increment = true;
+      this.startFrame = 1;
+      this.endFrame = this.frames.length - 1;
+    }
+
+    CanvasPlayer.prototype.reset = function() {
+      this.frames = [];
+      this.options = {};
+      this.paused = false;
+      this.index = 0;
+      this.fps = this.fps || 30;
+      this.loopStyle = 'beginning';
+      this.increment = true;
+      return this.startFrame = 0;
+    };
+
+    CanvasPlayer.prototype.setDimensions = function() {
+      if (this.player != null) {
+        this.canvas.width = this.player.displayWidth;
+        return this.canvas.height = this.player.displayHeight;
+      }
+    };
+
+    CanvasPlayer.prototype.play = function(options) {
+      if (options.player != null) {
+        this.player = options.player;
+      }
+      this.timeout = 1 / this.fps * 1000;
+      if (!this.paused) {
+        this.options = options || this.options;
+        if (this.endFrame > this.index) {
+          if (this.index <= this.startFrame) {
+            this.index = this.startFrame;
+            this.increment = true;
+          }
+          if (this.increment) {
+            this.index++;
+          } else {
+            this.index--;
+          }
+        } else {
+          if (this.loopStyle === 'beginning') {
+            this.index = this.startFrame;
+          } else {
+            this.index = this.endFrame - 1;
+            this.increment = false;
+          }
+        }
+        this.paintFrame(this.index);
+      }
+      return setTimeout((function(_this) {
+        return function() {
+          return _this.play(options);
+        };
+      })(this), this.timeout);
+    };
+
+    CanvasPlayer.prototype.pause = function() {
+      return this.paused = !this.paused;
+    };
+
+    CanvasPlayer.prototype.paintFrame = function(index) {
+      var frame;
+      if (index >= this.frames.length || index < 0) {
+        return false;
+      }
+      this.index = index || this.index;
+      frame = this.frames[this.index];
+      this.context.putImageData(frame, 0, 0);
+      if (this.options.progress) {
+        return this.options.progress();
+      }
+    };
+
+    return CanvasPlayer;
+
+  })();
+
+  window.Converter = (function() {
+    function Converter(canvas, frames, fps, player, options) {
+      this.canvas = canvas;
+      this.frames = frames;
+      this.fps = fps;
+      this.player = player;
+      this.options = options || {};
+      this.convertCanvas = document.createElement('canvas');
+      this.convertCanvas.width = this.canvas.width;
+      this.convertCanvas.height = this.canvas.height;
+      this.convertContext = this.convertCanvas.getContext('2d');
+      this.files = [];
+      this.uploadedFiles = [];
+      this.formdata = new FormData();
+      this.fps = this.fps || 10;
+      this.save = false;
+      this.uploadedSprite;
+      this.gifFinished = options.gifFinished;
+    }
+
+    Converter.prototype.reset = function() {
+      this.files = [];
+      this.uploadedFiles = [];
+      this.formdata = new FormData();
+      this.fps = this.fps || 10;
+      this.uploadedSprite = null;
+      return this.save = false;
+    };
+
+    Converter.prototype.convert = function() {
+      var frame, _i, _len, _ref;
+      this.files = [];
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        this.files.push(this.convertFrame(frame));
+      }
+      if (this.options.converted != null) {
+        return this.options.converted();
+      }
+    };
+
+    Converter.prototype.convertFrame = function(frame) {
+      var dataURL;
+      this.convertContext.putImageData(frame, 0, 0);
+      dataURL = this.convertCanvas.toDataURL();
+      return this.convertDataURL(dataURL);
+    };
+
+    Converter.prototype.convertDataURL = function(dataURL, type) {
+      var array, bb, blobBin, e, file, i;
+      type = type || "image/png";
+      blobBin = atob(dataURL.split(',')[1]);
+      array = [];
+      i = 0;
+      while (i < blobBin.length) {
+        array.push(blobBin.charCodeAt(i));
+        i++;
+      }
+      try {
+        return file = new Blob([new Uint8Array(array)], {
+          type: type
+        });
+      } catch (_error) {
+        e = _error;
+        window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder || window.MSBlobBuilder;
+        if (e.name === 'TypeError' && window.BlobBuilder) {
+          bb = new BlobBuilder();
+          bb.append([array.buffer]);
+          file = bb.getBlob("image/png");
+        } else if (e.name === "InvalidStateError") {
+          file = new Blob([array.buffer], {
+            type: "image/png"
+          });
+        }
+        return file;
+      }
+    };
+
+    Converter.prototype.totalFileSize = function() {
+      return this.files.reduce(function(acc, file) {
+        return acc += file.size;
+      }, 0);
+    };
+
+    Converter.prototype.framesInFinalGif = function(loopStyle) {
+      if (loopStyle === 'ping-pong') {
+        return (this.frames.length * 2) - 2;
+      } else {
+        return this.frames.length;
+      }
+    };
+
+    Converter.prototype.postPNGs = function(options) {
+      var file, index, _i, _len, _ref;
+      _ref = this.files;
+      for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
+        file = _ref[index];
+        this.formdata.append("upload[" + index + "]", file);
+      }
+      return $.ajax({
+        url: "http://smokescreen.dev:5000/",
+        type: "POST",
+        data: this.formdata,
+        processData: false,
+        contentType: false,
+        xhr: function() {
+          var req;
+          req = $.ajaxSettings.xhr();
+          if (req) {
+            if (options && options.progress) {
+              req.upload.addEventListener('progress', function(event) {
+                if (event.lengthComputable) {
+                  return options.progress(event);
+                }
+              }, false);
+            }
+          }
+          return req;
+        }
+      }).done((function(_this) {
+        return function(response) {
+          if (options && options.success) {
+            return options.success(response);
+          }
+        };
+      })(this)).always(function() {
+        console.log(new Date().getTime() / 1000);
+        if (options && options.complete) {
+          return options.complete();
+        }
+      }).fail(function() {
+        if (options && options.error) {
+          return options.error();
+        }
+      });
+    };
+
+    Converter.prototype.upload = function(loopStyle, options) {
+      var file, i, _i, _len, _ref;
+      loopStyle = loopStyle || false;
+      _ref = this.files;
+      for (i = _i = 0, _len = _ref.length; _i < _len; i = ++_i) {
+        file = _ref[i];
+        this.appendToForm(i, file);
+      }
+      this.formdata.append("ping", loopStyle === 'ping-pong');
+      this.formdata.append("fps", this.fps);
+      this.formdata.append("authenticity_token", AUTH_TOKEN);
+      if (options && options.description) {
+        this.formdata.append("description", options.description);
+      }
+      return $.ajax({
+        url: "/gifs",
+        type: "POST",
+        data: this.formdata,
+        processData: false,
+        contentType: false,
+        xhr: function() {
+          var req;
+          req = $.ajaxSettings.xhr();
+          if (req) {
+            if (options && options.progress) {
+              req.upload.addEventListener('progress', function(event) {
+                if (event.lengthComputable) {
+                  return options.progress(event);
+                }
+              }, false);
+            }
+          }
+          return req;
+        }
+      }).done(function(response) {
+        if (options && options.success) {
+          return options.success(response);
+        }
+      }).always(function() {
+        if (options && options.complete) {
+          return options.complete();
+        }
+      }).fail(function() {
+        if (options && options.error) {
+          return options.error();
+        }
+      });
+    };
+
+    Converter.prototype.uploadToS3 = function(fileBlobs, options) {
+      var $uploadForm, fd, file, index, key, postURL, _i, _len, _results;
+      fileBlobs = fileBlobs || this.files;
+      $uploadForm = $('#png-uploader');
+      _results = [];
+      for (index = _i = 0, _len = fileBlobs.length; _i < _len; index = ++_i) {
+        file = fileBlobs[index];
+        key = $uploadForm.data("key").replace('{index}', index).replace('{timestamp}', new Date().getTime()).replace('{unique_id}', Math.random().toString(36).substr(2, 16)).replace('{extension}', 'png');
+        fd = new FormData();
+        fd.append('utf8', '✓');
+        fd.append('key', key);
+        fd.append('acl', $uploadForm.find('#acl').val());
+        fd.append('AWSAccessKeyId', $uploadForm.find('#AWSAccessKeyId').val());
+        fd.append('policy', $uploadForm.find('#policy').val());
+        fd.append('signature', $uploadForm.find('#signature').val());
+        fd.append('success_action_status', "201");
+        fd.append('X-Requested-With', "xhr");
+        fd.append('Content-Type', "image/png");
+        fd.append("file", file);
+        postURL = $uploadForm.attr('action');
+        _results.push($.ajax({
+          url: postURL,
+          type: "POST",
+          data: fd,
+          processData: false,
+          contentType: false
+        }).done((function(_this) {
+          return function(response) {
+            var pngURL;
+            pngURL = $(response).find('Location').text();
+            _this.uploadedFiles.push(pngURL);
+            if (options && options.success) {
+              return options.success(response);
+            }
+          };
+        })(this)).always(function() {
+          if (options && options.complete) {
+            return options.complete();
+          }
+        }).fail(function() {
+          if (options && options.error) {
+            return options.error();
+          }
+        }));
+      }
+      return _results;
+    };
+
+    Converter.prototype.appendToForm = function(index, file) {
+      return this.formdata.append("upload[" + index + "]", file);
+    };
+
+    return Converter;
+
+  })();
 
   navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
@@ -353,11 +715,79 @@
   navigator.getUserMedia(constraints, successCallback, errorCallback);
 
   $(function() {
+    window.playbackCamSequence = new Sequence({
+      type: 'sequence',
+      aspect: 16 / 9,
+      duration: 3,
+      src: 'CanvasPlayer'
+    });
+    camSequence.drawAnimation = function(context, elapsed) {
+      return this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    };
+    return camSequence.ended = function() {
+      if (this.callback != null) {
+        this.callback();
+      }
+      this.cleanup();
+      return this.video.cleanup();
+    };
+  });
+
+  window.Recorder = (function() {
+    function Recorder(canvas) {
+      this.canvas = canvas;
+      this.captureFrames = __bind(this.captureFrames, this);
+      this.capturedFrames = [];
+      this.context = this.canvas.getContext('2d');
+      this.width = this.canvas.width;
+      this.height = this.canvas.height;
+    }
+
+    Recorder.prototype.reset = function() {
+      return this.capturedFrames = [];
+    };
+
+    Recorder.prototype.record = function(seconds, fps, options) {
+      var frames;
+      this.fps = fps;
+      this.options = options;
+      this.options = this.options || {};
+      this.fps = this.fps || 30;
+      seconds = seconds || 3;
+      this.totalFrames = frames = seconds * this.fps;
+      return this.captureFrames(frames);
+    };
+
+    Recorder.prototype.captureFrames = function(frames) {
+      this.options = this.options || {};
+      if (frames > 0) {
+        this.capturedFrames.push(this.context.getImageData(0, 0, this.width, this.height));
+        frames--;
+        setTimeout((function(_this) {
+          return function() {
+            return _this.captureFrames(frames);
+          };
+        })(this), 1000 / this.fps);
+        if (this.options.progress) {
+          return this.options.progress((this.totalFrames - frames) / this.totalFrames, this.capturedFrames[this.capturedFrames.length - 1]);
+        }
+      } else {
+        if (this.options.complete) {
+          return this.options.complete();
+        }
+      }
+    };
+
+    return Recorder;
+
+  })();
+
+  $(function() {
     window.player = new Player([
-      new VideoTrack({
+      camSequence, playbackCamSequence, new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }), testSequence, camSequence, new VideoTrack({
+      }), testSequence, new VideoTrack({
         src: '/assets/videos/ocean.mp4',
         aspect: 16 / 9
       })

@@ -3,7 +3,9 @@ $ ->
       type: 'sequence'
       src: 'webcam'
       aspect: 16/9
-      duration: 5
+      duration: 3
+      onStart: ->
+        @recordCam(3)
 
   camSequence.drawAnimation = (context, elapsed) ->
     x = elapsed * 100
@@ -21,6 +23,20 @@ $ ->
     @callback() if @callback?
     @cleanup()
     @video.cleanup()
+
+  camSequence.recordCam = (seconds) ->
+    window.recorder = new Recorder @video.canvas
+    recorder.record seconds, 40,
+      complete: =>
+        log 'recording complete'
+        window.converter = new Converter recorder.canvas,
+                            recorder.capturedFrames,
+                            recorder.fps,
+                            null,
+                            converted: ->
+                              log 'converted'
+
+        converter.convert()
 
 
 # window.CamSequence =
