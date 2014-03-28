@@ -46,7 +46,7 @@ $ ->
     else
       complete = null
 
-    recorder.record seconds, 40,
+    recorder.record seconds, duration,
       complete: complete
 
     recorder

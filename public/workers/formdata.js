@@ -30,7 +30,7 @@
 
     var ___open$rw = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype['open'] = function() {
-      console.log(arguments);
+      // console.log(arguments);
       // Invoke original XHR.open
       return ___open$rw.apply(this, arguments);
     };
