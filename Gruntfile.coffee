@@ -16,6 +16,9 @@ module.exports = (grunt) ->
       js: [
         '<%= project.src %>/coffee/*'
       ]
+      workers: [
+        '<%= project.src %>/workers/*'
+      ]
 
     watch:
       options:
@@ -26,6 +29,12 @@ module.exports = (grunt) ->
       coffeescripts:
         files: ['<%= project.js %>']
         tasks: ['coffee:dev']
+        options:
+          spawn: false
+          livereload: true
+      workers:
+        files: ['<%= project.workers %>']
+        tasks: ['coffee:workers']
         options:
           spawn: false
           livereload: true
@@ -53,6 +62,18 @@ module.exports = (grunt) ->
           sourceMap: true
         files:
           '<%= project.assets %>/js/app.js': '<%= project.js %>'
+      workers:
+        options:
+          sourceMap: true
+          bare: true
+        expand: true
+        cwd: 'src'
+        src: ['workers/*']
+        dest: 'public'
+        ext: '.js'
+        rename: (dest, src) ->
+          console.log dest, src
+          dest + '/' + src.replace(/\.coffee$/, '.js')
       dist:
         files:
           '<%= project.assets %>/js/app.js': '<%= project.js %>'

@@ -350,8 +350,7 @@
       return this.video.cleanup();
     };
     camSequence.recordCam = function(seconds) {
-      window.recorder = this.record(this.video.canvas, seconds);
-      return window.littleRecorder = this.record(this.video.littleCanvas, seconds, true);
+      return window.recorder = this.record(this.video.canvas, seconds, true);
     };
     return camSequence.record = function(canvas, seconds, convert) {
       var complete, recorder;
@@ -365,7 +364,7 @@
                 return log('converted');
               }
             });
-            return converter.convertAndUpload();
+            return converter.runWorker();
           };
         })(this);
       } else {
@@ -517,6 +516,24 @@
         log("Total time took: " + (new Date().getTime() - this.startedAt) / 1000 + 'secs');
         return alert('DONE');
       }
+    };
+
+    Converter.prototype.runWorker = function() {
+      var frame, worker, _i, _len, _ref, _results;
+      worker = new Worker('/workers/convertToImage.js');
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          log('Worker said: ', e.data);
+          return _this.files.push(e.data);
+        };
+      })(this), false);
+      _ref = this.frames;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        _results.push(worker.postMessage(frame));
+      }
+      return _results;
     };
 
     Converter.prototype.convert = function() {
@@ -879,10 +896,10 @@
   $(function() {
     window.faces = [];
     window.player = new Player([
-      camSequence, new VideoTrack({
+      camSequence, testSequence, new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }), testSequence, new VideoTrack({
+      }), new VideoTrack({
         src: '/assets/videos/ocean.mp4',
         aspect: 16 / 9
       })

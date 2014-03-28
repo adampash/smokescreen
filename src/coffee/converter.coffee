@@ -39,13 +39,35 @@ class window.Converter
       log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
       alert 'DONE'
 
+  runWorker: ->
+    worker = new Worker('/workers/convertToImage.js')
+    # worker = new Worker('/workers/usain-png.js')
+
+    worker.addEventListener('message', (e) =>
+      log('Worker said: ', e.data)
+      @files.push e.data
+      # log('Worker responded: ')
+
+      # img = document.createElement('img')
+      # img.src = e.data
+      # data:image/png,base64,
+      # document.body.appendChild(img)
+
+    , false)
+
+    for frame in @frames
+      worker.postMessage frame
+
+
   convert: ->
     @files = []
+
     @files.push(@convertFrame(frame)) for frame in @frames
     @options.converted() if @options.converted?
 
   convertFrame: (frame) ->
     @convertContext.putImageData(frame, 0, 0)
+
     dataURL = @convertCanvas.toDataURL()
 
     @convertDataURL(dataURL)
