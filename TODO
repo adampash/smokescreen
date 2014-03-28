@@ -1,4 +1,5 @@
 TODO
+* remove logs from background
 * Background workers:
   http://www.html5rocks.com/en/tutorials/workers/basics/
 * Adjust sequence to display size (so, for example, green rectangle scales to video)

@@ -24,7 +24,6 @@ class window.Converter
   convertAndUpload: ->
     if !@convertingFrames?
       @convertingFrames = @frames
-      @startedAt = new Date().getTime()
 
     if @convertingFrames.length > 0
       # log @convertingFrames.length if @convertingFrames.length%20==0
@@ -36,28 +35,25 @@ class window.Converter
       )
     else
       log 'All done converting and uploading frames'
-      log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
       alert 'DONE'
 
   runWorker: ->
-    worker = new Worker('/workers/convertToImage.js')
-    # worker = new Worker('/workers/usain-png.js')
+    worker = new Worker('/workers/findFaces.js')
 
     worker.addEventListener('message', (e) =>
-      log('Worker said: ', e.data)
-      @files.push e.data
-      # log('Worker responded: ')
-
-      # img = document.createElement('img')
-      # img.src = e.data
-      # data:image/png,base64,
-      # document.body.appendChild(img)
-
+      log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
+      alert 'DONE'
+      log 'start processing images now'
+      @foundFaces = e.data
     , false)
 
-    for frame in @frames
-      worker.postMessage frame
-
+    framesToProcess = (frame for frame in @frames by 5)
+    @startedAt = new Date().getTime()
+    worker.postMessage framesToProcess
+    # for frame in @frames
+    #   worker.postMessage frame
+    # frame = @frames[10]
+    # worker.postMessage frame
 
   convert: ->
     @files = []

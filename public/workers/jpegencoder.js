@@ -687,10 +687,10 @@ function JPEGEncoder(quality) {
 
     // benchmarking
     var duration = new Date().getTime() - time_start;
-    console.log('Encoding time: '+ duration + 'ms');
+    // console.log('Encoding time: '+ duration + 'ms');
     //
 
-    return jpegDataUri			
+    return jpegDataUri
   }
 
   function setQuality(quality){
@@ -726,7 +726,7 @@ function JPEGEncoder(quality) {
 
     setQuality(quality);
     var duration = new Date().getTime() - time_start;
-    console.log('Initialization '+ duration + 'ms');
+    // console.log('Initialization '+ duration + 'ms');
   }
 
   init();

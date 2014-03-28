@@ -228,7 +228,7 @@
         if (options.littleCanvas != null) {
           this.littleCanvas = this.createCanvas();
           this.littleCanvas.width = 480;
-          this.littleCanvas.height = 320;
+          this.littleCanvas.height = 270;
           this.littleContext = this.createContext(this.littleCanvas);
         }
       }
@@ -323,7 +323,7 @@
 
   $(function() {
     var duration;
-    duration = 1;
+    duration = 10;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -350,7 +350,8 @@
       return this.video.cleanup();
     };
     camSequence.recordCam = function(seconds) {
-      return window.recorder = this.record(this.video.canvas, seconds, true);
+      window.recorder = this.record(this.video.canvas, seconds, false);
+      return window.littleRecorder = this.record(this.video.littleCanvas, seconds, true);
     };
     return camSequence.record = function(canvas, seconds, convert) {
       var complete, recorder;
@@ -499,7 +500,6 @@
       var file;
       if (this.convertingFrames == null) {
         this.convertingFrames = this.frames;
-        this.startedAt = new Date().getTime();
       }
       if (this.convertingFrames.length > 0) {
         file = this.convertFrame(this.convertingFrames.shift());
@@ -513,27 +513,33 @@
         });
       } else {
         log('All done converting and uploading frames');
-        log("Total time took: " + (new Date().getTime() - this.startedAt) / 1000 + 'secs');
         return alert('DONE');
       }
     };
 
     Converter.prototype.runWorker = function() {
-      var frame, worker, _i, _len, _ref, _results;
-      worker = new Worker('/workers/convertToImage.js');
+      var frame, framesToProcess, worker;
+      worker = new Worker('/workers/findFaces.js');
       worker.addEventListener('message', (function(_this) {
         return function(e) {
-          log('Worker said: ', e.data);
-          return _this.files.push(e.data);
+          log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+          alert('DONE');
+          log('start processing images now');
+          return _this.foundFaces = e.data;
         };
       })(this), false);
-      _ref = this.frames;
-      _results = [];
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        frame = _ref[_i];
-        _results.push(worker.postMessage(frame));
-      }
-      return _results;
+      framesToProcess = (function() {
+        var _i, _len, _ref, _results;
+        _ref = this.frames;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i += 5) {
+          frame = _ref[_i];
+          _results.push(frame);
+        }
+        return _results;
+      }).call(this);
+      this.startedAt = new Date().getTime();
+      return worker.postMessage(framesToProcess);
     };
 
     Converter.prototype.convert = function() {

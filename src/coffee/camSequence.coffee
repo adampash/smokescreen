@@ -1,5 +1,5 @@
 $ ->
-  duration = 1
+  duration = 10
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -26,8 +26,8 @@ $ ->
     @video.cleanup()
 
   camSequence.recordCam = (seconds) ->
-    window.recorder = @record(@video.canvas, seconds, true)
-    # window.littleRecorder = @record(@video.littleCanvas, seconds, true)
+    window.recorder = @record(@video.canvas, seconds, false)
+    window.littleRecorder = @record(@video.littleCanvas, seconds, true)
 
   camSequence.record = (canvas, seconds, convert) ->
     recorder = new Recorder canvas

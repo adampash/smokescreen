@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "file": "formdata.js",
+  "sourceRoot": "../../src/workers/",
+  "sources": [
+    "formdata.coffee"
+  ],
+  "names": [],
+  "mappings": "AAiBQ"
+}
