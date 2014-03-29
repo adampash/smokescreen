@@ -7,7 +7,7 @@ $ ->
       # onStart: ->
       #   @recordCam(3)
 
-  camSequence.drawAnimation = (context, elapsed) ->
+  playbackCamSequence.drawAnimation = (context, elapsed) ->
     @context.clearRect(0, 0,
                       @canvas.width,
                       @canvas.height)
@@ -16,7 +16,8 @@ $ ->
 
 
 
-  camSequence.ended = ->
+  playbackCamSequence.ended = ->
     @callback() if @callback?
+    console.log 'callback and cleanup'
     @cleanup()
     @video.cleanup()

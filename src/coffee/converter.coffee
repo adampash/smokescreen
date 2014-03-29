@@ -61,10 +61,13 @@ class window.Converter
     @files.push(@convertFrame(frame)) for frame in @frames
     @options.converted() if @options.converted?
 
-  convertFrame: (frame) ->
+  toDataURL: (frame) ->
     @convertContext.putImageData(frame, 0, 0)
 
     dataURL = @convertCanvas.toDataURL()
+
+  convertFrame: (frame) ->
+    dataURL = @toDataURL(frame)
 
     @convertDataURL(dataURL)
 
@@ -175,7 +178,7 @@ class window.Converter
       if options and options.success
         options.success(response)
     .always ->
-      console.log new Date().getTime() / 1000
+      log new Date().getTime() / 1000
       if options and options.complete
         options.complete()
     .fail ->

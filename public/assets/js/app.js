@@ -73,7 +73,6 @@
         this.context = this.createContext(this.canvas);
         this.canvases = [];
         this.canvases.push(this.canvas);
-        $('body').append(this.canvas);
         this.playing = false;
         _this = this;
         $(window).resize((function(_this) {
@@ -98,6 +97,7 @@
       };
 
       Sequence.prototype.play = function(player, callback) {
+        $('body').append(this.canvas);
         log('playSequence');
         this.playing = true;
         this.player = player;
@@ -105,14 +105,23 @@
         this.setDimensions();
         if (this.src != null) {
           if (this.src === 'webcam') {
-            log('get webcam');
+            log('it is a webcam');
             this.src = webcam.src;
             this.video = new VideoTrack({
               src: this.src,
               aspect: this.aspect,
-              littleCanvas: true
+              littleCanvas: true,
+              shouldDraw: false
             });
-            this.video.play(this.player);
+            this.video.play(this.player, null, {
+              onplaystart: (function(_this) {
+                return function() {
+                  if (_this.onStart != null) {
+                    return _this.onStart();
+                  }
+                };
+              })(this)
+            });
             this.startSequence();
             return this.canvases.push(this.video);
           } else if (this.src === 'CanvasPlayer') {
@@ -140,10 +149,7 @@
 
       Sequence.prototype.startSequence = function() {
         this.sequenceStart = new Date();
-        this.drawSequence();
-        if (this.onStart != null) {
-          return this.onStart();
-        }
+        return this.drawSequence();
       };
 
       Sequence.prototype.drawSequence = function() {
@@ -225,6 +231,7 @@
         this.canvas.id = new Date().getTime();
         this.context = this.createContext(this.canvas);
         this.videoPlaying = false;
+        this.shouldDraw = options.shouldDraw || true;
         if (options.littleCanvas != null) {
           this.littleCanvas = this.createCanvas();
           this.littleCanvas.width = 480;
@@ -281,7 +288,9 @@
               _this.onplaystart();
             }
             _this.videoPlaying = true;
-            return _this.drawVideo();
+            if (_this.shouldDraw) {
+              return _this.drawVideo();
+            }
           };
         })(this));
         return video.addEventListener('ended', (function(_this) {
@@ -323,7 +332,7 @@
 
   $(function() {
     var duration;
-    duration = 10;
+    duration = 3;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -333,15 +342,7 @@
         return this.recordCam(duration);
       }
     });
-    camSequence.drawAnimation = function(context, elapsed) {
-      var x, y;
-      x = elapsed * 100;
-      y = elapsed * 100;
-      this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      this.context.fillStyle = 'rgba(0, 100, 0, 0.4)';
-      this.context.fillOpacity = 0.1;
-      return this.context.fillRect(x, y, 400, 400);
-    };
+    camSequence.drawAnimation = function(context, elapsed) {};
     camSequence.ended = function() {
       if (this.callback != null) {
         this.callback();
@@ -354,7 +355,7 @@
       return window.littleRecorder = this.record(this.video.littleCanvas, seconds, true);
     };
     return camSequence.record = function(canvas, seconds, convert) {
-      var complete, recorder;
+      var complete, fps, recorder;
       recorder = new Recorder(canvas);
       if (convert) {
         complete = (function(_this) {
@@ -371,7 +372,8 @@
       } else {
         complete = null;
       }
-      recorder.record(seconds, duration, {
+      fps = 30;
+      recorder.record(seconds, fps, {
         complete: complete
       });
       return recorder;
@@ -389,6 +391,7 @@
       this.index = 0;
       this.fps = this.fps || 30;
       this.loopStyle = 'beginning';
+      this.loop = false;
       this.increment = true;
       this.startFrame = 1;
       this.endFrame = this.frames.length - 1;
@@ -430,6 +433,13 @@
             this.index--;
           }
         } else {
+          log("END THIS GUY", this.endFrame, this.index);
+          if (!this.loop) {
+            debugger;
+            if (options.ended) {
+              return options.ended();
+            }
+          }
           if (this.loopStyle === 'beginning') {
             this.index = this.startFrame;
           } else {
@@ -461,6 +471,14 @@
       if (this.options.progress) {
         return this.options.progress();
       }
+    };
+
+    CanvasPlayer.prototype.cleanup = function() {
+      return setTimeout((function(_this) {
+        return function() {
+          return $(_this.canvas).remove();
+        };
+      })(this), 300);
     };
 
     return CanvasPlayer;
@@ -555,10 +573,15 @@
       }
     };
 
-    Converter.prototype.convertFrame = function(frame) {
+    Converter.prototype.toDataURL = function(frame) {
       var dataURL;
       this.convertContext.putImageData(frame, 0, 0);
-      dataURL = this.convertCanvas.toDataURL();
+      return dataURL = this.convertCanvas.toDataURL();
+    };
+
+    Converter.prototype.convertFrame = function(frame) {
+      var dataURL;
+      dataURL = this.toDataURL(frame);
       return this.convertDataURL(dataURL);
     };
 
@@ -688,7 +711,7 @@
           }
         };
       })(this)).always(function() {
-        console.log(new Date().getTime() / 1000);
+        log(new Date().getTime() / 1000);
         if (options && options.complete) {
           return options.complete();
         }
@@ -838,13 +861,14 @@
       duration: 3,
       src: 'CanvasPlayer'
     });
-    camSequence.drawAnimation = function(context, elapsed) {
+    playbackCamSequence.drawAnimation = function(context, elapsed) {
       return this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     };
-    return camSequence.ended = function() {
+    return playbackCamSequence.ended = function() {
       if (this.callback != null) {
         this.callback();
       }
+      console.log('callback and cleanup');
       this.cleanup();
       return this.video.cleanup();
     };
@@ -871,7 +895,8 @@
       this.options = this.options || {};
       this.fps = this.fps || 30;
       seconds = seconds || 3;
-      this.totalFrames = frames = seconds * this.fps;
+      this.totalFrames = seconds * this.fps;
+      frames = this.totalFrames;
       return this.captureFrames(frames);
     };
 

@@ -14,7 +14,6 @@ $ ->
 
       @canvases = []
       @canvases.push @canvas
-      $('body').append(@canvas)
 
       @playing = false
 
@@ -34,6 +33,7 @@ $ ->
 
 
     play: (player, callback) ->
+      $('body').append(@canvas)
       log 'playSequence'
       @playing = true
       @player = player
@@ -43,13 +43,17 @@ $ ->
 
       if @src?
         if @src is 'webcam'
-          log 'get webcam'
+          log 'it is a webcam'
           @src = webcam.src
           @video = new VideoTrack
             src: @src
             aspect: @aspect
             littleCanvas: true
-          @video.play(@player)
+            shouldDraw: false
+          @video.play(@player, null,
+            onplaystart: =>
+              @onStart() if @onStart?
+          )
           @startSequence()
           @canvases.push @video
         else if @src is 'CanvasPlayer'
@@ -71,7 +75,6 @@ $ ->
     startSequence: ->
       @sequenceStart = new Date()
       @drawSequence()
-      @onStart() if @onStart?
 
     drawSequence: =>
       elapsed = (new Date() - @sequenceStart) / 1000

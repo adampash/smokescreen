@@ -1,5 +1,5 @@
 $ ->
-  duration = 10
+  duration = 3
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -9,16 +9,6 @@ $ ->
         @recordCam(duration)
 
   camSequence.drawAnimation = (context, elapsed) ->
-    x = elapsed * 100
-    y = elapsed * 100
-    @context.clearRect(0, 0,
-                      @canvas.width,
-                      @canvas.height)
-
-
-    @context.fillStyle = 'rgba(0, 100, 0, 0.4)'
-    @context.fillOpacity = 0.1
-    @context.fillRect(x, y, 400, 400)
 
   camSequence.ended = ->
     @callback() if @callback?
@@ -46,7 +36,8 @@ $ ->
     else
       complete = null
 
-    recorder.record seconds, duration,
+    fps = 30
+    recorder.record seconds, fps,
       complete: complete
 
     recorder

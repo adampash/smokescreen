@@ -11,6 +11,8 @@ $ ->
 
       @videoPlaying = false
 
+      @shouldDraw = options.shouldDraw || true
+
       if options.littleCanvas?
         @littleCanvas = @createCanvas()
         @littleCanvas.width = 480
@@ -60,7 +62,7 @@ $ ->
       video.addEventListener 'playing', (event) =>
         @onplaystart() if @onplaystart?
         @videoPlaying = true
-        @drawVideo()
+        @drawVideo() if @shouldDraw
 
       video.addEventListener 'ended', (event) =>
         if @video is event.srcElement

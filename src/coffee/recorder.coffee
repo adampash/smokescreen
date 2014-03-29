@@ -13,7 +13,8 @@ class window.Recorder
     @options = @options || {}
     @fps = @fps || 30
     seconds = seconds || 3
-    @totalFrames = frames = seconds * @fps
+    @totalFrames = seconds * @fps
+    frames = @totalFrames
     @captureFrames(frames)
 
   captureFrames: (frames) =>
@@ -21,6 +22,7 @@ class window.Recorder
 
     if frames > 0
       @capturedFrames.push(@context.getImageData(0, 0, @width, @height))
+
       frames--
       setTimeout =>
         @captureFrames(frames)

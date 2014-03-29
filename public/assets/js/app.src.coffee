@@ -54,7 +54,6 @@ $ ->
 
       @canvases = []
       @canvases.push @canvas
-      $('body').append(@canvas)
 
       @playing = false
 
@@ -74,6 +73,7 @@ $ ->
 
 
     play: (player, callback) ->
+      $('body').append(@canvas)
       log 'playSequence'
       @playing = true
       @player = player
@@ -83,13 +83,17 @@ $ ->
 
       if @src?
         if @src is 'webcam'
-          log 'get webcam'
+          log 'it is a webcam'
           @src = webcam.src
           @video = new VideoTrack
             src: @src
             aspect: @aspect
             littleCanvas: true
-          @video.play(@player)
+            shouldDraw: false
+          @video.play(@player, null,
+            onplaystart: =>
+              @onStart() if @onStart?
+          )
           @startSequence()
           @canvases.push @video
         else if @src is 'CanvasPlayer'
@@ -111,7 +115,6 @@ $ ->
     startSequence: ->
       @sequenceStart = new Date()
       @drawSequence()
-      @onStart() if @onStart?
 
     drawSequence: =>
       elapsed = (new Date() - @sequenceStart) / 1000
@@ -179,6 +182,8 @@ $ ->
 
       @videoPlaying = false
 
+      @shouldDraw = options.shouldDraw || true
+
       if options.littleCanvas?
         @littleCanvas = @createCanvas()
         @littleCanvas.width = 480
@@ -228,7 +233,7 @@ $ ->
       video.addEventListener 'playing', (event) =>
         @onplaystart() if @onplaystart?
         @videoPlaying = true
-        @drawVideo()
+        @drawVideo() if @shouldDraw
 
       video.addEventListener 'ended', (event) =>
         if @video is event.srcElement
@@ -253,7 +258,7 @@ $ ->
       context = canvas.getContext '2d'
 
 $ ->
-  duration = 10
+  duration = 3
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -263,16 +268,6 @@ $ ->
         @recordCam(duration)
 
   camSequence.drawAnimation = (context, elapsed) ->
-    x = elapsed * 100
-    y = elapsed * 100
-    @context.clearRect(0, 0,
-                      @canvas.width,
-                      @canvas.height)
-
-
-    @context.fillStyle = 'rgba(0, 100, 0, 0.4)'
-    @context.fillOpacity = 0.1
-    @context.fillRect(x, y, 400, 400)
 
   camSequence.ended = ->
     @callback() if @callback?
@@ -300,7 +295,8 @@ $ ->
     else
       complete = null
 
-    recorder.record seconds, duration,
+    fps = 30
+    recorder.record seconds, fps,
       complete: complete
 
     recorder
@@ -314,6 +310,7 @@ class window.CanvasPlayer
     @index = 0
     @fps = @fps || 30
     @loopStyle = 'beginning'
+    @loop = false
     @increment = true
     @startFrame = 1
     @endFrame = @frames.length - 1
@@ -344,6 +341,10 @@ class window.CanvasPlayer
           @increment = true
         if @increment then @index++ else @index--
       else
+        log "END THIS GUY", @endFrame, @index
+        unless @loop
+          debugger
+          return options.ended() if options.ended
         if @loopStyle == 'beginning'
           @index = @startFrame
         else
@@ -366,6 +367,10 @@ class window.CanvasPlayer
     @context.putImageData(frame, 0, 0)
     @options.progress() if @options.progress
 
+  cleanup: ->
+    setTimeout =>
+      $(@canvas).remove()
+    , 300
 
 class window.Converter
   constructor: (@canvas, @frames, @fps, @player, options) ->
@@ -430,10 +435,13 @@ class window.Converter
     @files.push(@convertFrame(frame)) for frame in @frames
     @options.converted() if @options.converted?
 
-  convertFrame: (frame) ->
+  toDataURL: (frame) ->
     @convertContext.putImageData(frame, 0, 0)
 
     dataURL = @convertCanvas.toDataURL()
+
+  convertFrame: (frame) ->
+    dataURL = @toDataURL(frame)
 
     @convertDataURL(dataURL)
 
@@ -544,7 +552,7 @@ class window.Converter
       if options and options.success
         options.success(response)
     .always ->
-      console.log new Date().getTime() / 1000
+      log new Date().getTime() / 1000
       if options and options.complete
         options.complete()
     .fail ->
@@ -685,7 +693,7 @@ $ ->
       # onStart: ->
       #   @recordCam(3)
 
-  camSequence.drawAnimation = (context, elapsed) ->
+  playbackCamSequence.drawAnimation = (context, elapsed) ->
     @context.clearRect(0, 0,
                       @canvas.width,
                       @canvas.height)
@@ -694,8 +702,9 @@ $ ->
 
 
 
-  camSequence.ended = ->
+  playbackCamSequence.ended = ->
     @callback() if @callback?
+    console.log 'callback and cleanup'
     @cleanup()
     @video.cleanup()
 
@@ -714,7 +723,8 @@ class window.Recorder
     @options = @options || {}
     @fps = @fps || 30
     seconds = seconds || 3
-    @totalFrames = frames = seconds * @fps
+    @totalFrames = seconds * @fps
+    frames = @totalFrames
     @captureFrames(frames)
 
   captureFrames: (frames) =>
@@ -722,6 +732,7 @@ class window.Recorder
 
     if frames > 0
       @capturedFrames.push(@context.getImageData(0, 0, @width, @height))
+
       frames--
       setTimeout =>
         @captureFrames(frames)
@@ -739,10 +750,10 @@ $ ->
   window.player = new Player [
       camSequence
     ,
-    #   playbackCamSequence
-    # ,
       testSequence
     ,
+    #   playbackCamSequence
+    # ,
       new VideoTrack
         src: '/assets/videos/short.mov'
         aspect: 16/9

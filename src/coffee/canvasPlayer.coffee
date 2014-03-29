@@ -6,6 +6,7 @@ class window.CanvasPlayer
     @index = 0
     @fps = @fps || 30
     @loopStyle = 'beginning'
+    @loop = false
     @increment = true
     @startFrame = 1
     @endFrame = @frames.length - 1
@@ -36,6 +37,10 @@ class window.CanvasPlayer
           @increment = true
         if @increment then @index++ else @index--
       else
+        log "END THIS GUY", @endFrame, @index
+        unless @loop
+          debugger
+          return options.ended() if options.ended
         if @loopStyle == 'beginning'
           @index = @startFrame
         else
@@ -58,3 +63,7 @@ class window.CanvasPlayer
     @context.putImageData(frame, 0, 0)
     @options.progress() if @options.progress
 
+  cleanup: ->
+    setTimeout =>
+      $(@canvas).remove()
+    , 300
