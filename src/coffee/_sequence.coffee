@@ -60,6 +60,8 @@ $ ->
           @video = new CanvasPlayer @canvas, window.recorder.capturedFrames, window.recorder.fps
           @video.play(
             player: @player
+            ended: =>
+              @ended()
           )
         else
           @video = new VideoTrack

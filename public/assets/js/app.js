@@ -127,7 +127,12 @@
           } else if (this.src === 'CanvasPlayer') {
             this.video = new CanvasPlayer(this.canvas, window.recorder.capturedFrames, window.recorder.fps);
             return this.video.play({
-              player: this.player
+              player: this.player,
+              ended: (function(_this) {
+                return function() {
+                  return _this.ended();
+                };
+              })(this)
             });
           } else {
             this.video = new VideoTrack({
@@ -433,11 +438,9 @@
             this.index--;
           }
         } else {
-          log("END THIS GUY", this.endFrame, this.index);
           if (!this.loop) {
-            debugger;
-            if (options.ended) {
-              return options.ended();
+            if (this.options.ended) {
+              return this.options.ended();
             }
           }
           if (this.loopStyle === 'beginning') {
@@ -927,7 +930,7 @@
   $(function() {
     window.faces = [];
     window.player = new Player([
-      camSequence, testSequence, new VideoTrack({
+      camSequence, testSequence, playbackCamSequence, new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
       }), new VideoTrack({

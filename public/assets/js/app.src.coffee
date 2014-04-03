@@ -100,6 +100,8 @@ $ ->
           @video = new CanvasPlayer @canvas, window.recorder.capturedFrames, window.recorder.fps
           @video.play(
             player: @player
+            ended: =>
+              @ended()
           )
         else
           @video = new VideoTrack
@@ -341,10 +343,8 @@ class window.CanvasPlayer
           @increment = true
         if @increment then @index++ else @index--
       else
-        log "END THIS GUY", @endFrame, @index
         unless @loop
-          debugger
-          return options.ended() if options.ended
+          return @options.ended() if @options.ended
         if @loopStyle == 'beginning'
           @index = @startFrame
         else
@@ -752,8 +752,8 @@ $ ->
     ,
       testSequence
     ,
-    #   playbackCamSequence
-    # ,
+      playbackCamSequence
+    ,
       new VideoTrack
         src: '/assets/videos/short.mov'
         aspect: 16/9

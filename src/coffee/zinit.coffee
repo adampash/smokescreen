@@ -5,8 +5,8 @@ $ ->
     ,
       testSequence
     ,
-    #   playbackCamSequence
-    # ,
+      playbackCamSequence
+    ,
       new VideoTrack
         src: '/assets/videos/short.mov'
         aspect: 16/9

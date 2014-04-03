@@ -37,10 +37,8 @@ class window.CanvasPlayer
           @increment = true
         if @increment then @index++ else @index--
       else
-        log "END THIS GUY", @endFrame, @index
         unless @loop
-          debugger
-          return options.ended() if options.ended
+          return @options.ended() if @options.ended
         if @loopStyle == 'beginning'
           @index = @startFrame
         else
