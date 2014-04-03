@@ -42,9 +42,9 @@ class window.Converter
 
     worker.addEventListener('message', (e) =>
       log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
-      alert 'DONE'
       log 'start processing images now'
       @foundFaces = e.data
+      @options.converted() if @options.converted?
     , false)
 
     framesToProcess = (frame for frame in @frames by 5)

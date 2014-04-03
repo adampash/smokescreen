@@ -28,3 +28,6 @@ $ ->
         @, =>
           @nextTrack()
       )
+
+    addTrack: (track) ->
+      @tracks.push track

@@ -24,17 +24,16 @@ $ ->
 
     if convert
       complete = =>
-        log 'recording complete'
-        window.converter = new Converter recorder.canvas,
-                            recorder.capturedFrames,
-                            recorder.fps,
-                            null,
-                            converted: ->
-                              log 'converted'
-        # converter.convertAndUpload()
-        converter.runWorker()
+        # window.converter = new Converter recorder.canvas,
+        #                     recorder.capturedFrames,
+        #                     recorder.fps,
+        #                     null,
+        #                     converted: ->
+        # converter.runWorker()
     else
-      complete = null
+      complete = =>
+        @doProcessing(recorder.capturedFrames, recorder.fps)
+
 
     fps = 30
     recorder.record seconds, fps,
@@ -42,3 +41,6 @@ $ ->
 
     recorder
 
+  camSequence.doProcessing = (frames, fps) ->
+    processor = new Processor frames, null, fps
+    processor.saturate()

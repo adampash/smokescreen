@@ -50,6 +50,10 @@
         })(this));
       };
 
+      Player.prototype.addTrack = function(track) {
+        return this.tracks.push(track);
+      };
+
       return Player;
 
     })();
@@ -61,6 +65,7 @@
         this.drawSequence = __bind(this.drawSequence, this);
         this.setDimensions = __bind(this.setDimensions, this);
         var _this;
+        this.options = options;
         this.type = 'sequence';
         this.src = options.src;
         this.aspect = options.aspect;
@@ -125,7 +130,7 @@
             this.startSequence();
             return this.canvases.push(this.video);
           } else if (this.src === 'CanvasPlayer') {
-            this.video = new CanvasPlayer(this.canvas, window.recorder.capturedFrames, window.recorder.fps);
+            this.video = new CanvasPlayer(this.canvas, this.options.frames || window.recorder.capturedFrames, this.options.fps || window.recorder.fps);
             return this.video.play({
               player: this.player,
               ended: (function(_this) {
@@ -359,29 +364,30 @@
       window.recorder = this.record(this.video.canvas, seconds, false);
       return window.littleRecorder = this.record(this.video.littleCanvas, seconds, true);
     };
-    return camSequence.record = function(canvas, seconds, convert) {
+    camSequence.record = function(canvas, seconds, convert) {
       var complete, fps, recorder;
       recorder = new Recorder(canvas);
       if (convert) {
         complete = (function(_this) {
-          return function() {
-            log('recording complete');
-            window.converter = new Converter(recorder.canvas, recorder.capturedFrames, recorder.fps, null, {
-              converted: function() {
-                return log('converted');
-              }
-            });
-            return converter.runWorker();
-          };
+          return function() {};
         })(this);
       } else {
-        complete = null;
+        complete = (function(_this) {
+          return function() {
+            return _this.doProcessing(recorder.capturedFrames, recorder.fps);
+          };
+        })(this);
       }
       fps = 30;
       recorder.record(seconds, fps, {
         complete: complete
       });
       return recorder;
+    };
+    return camSequence.doProcessing = function(frames, fps) {
+      var processor;
+      processor = new Processor(frames, null, fps);
+      return processor.saturate();
     };
   });
 
@@ -544,9 +550,11 @@
       worker.addEventListener('message', (function(_this) {
         return function(e) {
           log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
-          alert('DONE');
           log('start processing images now');
-          return _this.foundFaces = e.data;
+          _this.foundFaces = e.data;
+          if (_this.options.converted != null) {
+            return _this.options.converted();
+          }
         };
       })(this), false);
       framesToProcess = (function() {
@@ -871,11 +879,88 @@
       if (this.callback != null) {
         this.callback();
       }
-      console.log('callback and cleanup');
       this.cleanup();
       return this.video.cleanup();
     };
   });
+
+  window.Processor = (function() {
+    function Processor(frames, faces, options) {
+      this.frames = frames;
+      this.faces = faces;
+      this.options = options;
+      this.newFrames = [];
+    }
+
+    Processor.prototype.saturate = function(percent) {
+      var frame, worker, _i, _len, _ref, _results;
+      this.newFrames = [];
+      worker = new Worker('/workers/saturate.js');
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          _this.newFrames.push(e.data[0]);
+          if (_this.newFrames.length === _this.frames.length) {
+            _this.frames = _this.newFrames;
+            return _this.blur(1);
+          }
+        };
+      })(this), false);
+      this.startedAt = new Date().getTime();
+      _ref = this.frames;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        _results.push(worker.postMessage([frame]));
+      }
+      return _results;
+    };
+
+    Processor.prototype.blur = function(rate) {
+      var frame, worker, _i, _len, _ref, _results;
+      this.newFrames = [];
+      worker = new Worker('/workers/blur.js');
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          var graySequence;
+          _this.newFrames.push(e.data[0]);
+          if (_this.newFrames.length === _this.frames.length) {
+            log('time to add sequence to player');
+            log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+            graySequence = new Sequence({
+              type: 'sequence',
+              aspect: 16 / 9,
+              duration: 3,
+              src: 'CanvasPlayer',
+              frames: _this.newFrames
+            });
+            graySequence.ended = function() {
+              if (this.callback != null) {
+                this.callback();
+              }
+              this.cleanup();
+              return this.video.cleanup();
+            };
+            player.addTrack(graySequence);
+            return player.addTrack(new VideoTrack({
+              src: '/assets/videos/ocean.mp4',
+              aspect: 16 / 9
+            }));
+          }
+        };
+      })(this), false);
+      this.startedAt = new Date().getTime();
+      _ref = this.frames;
+      _results = [];
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        _results.push(worker.postMessage([frame]));
+      }
+      return _results;
+    };
+
+    return Processor;
+
+  })();
 
   window.Recorder = (function() {
     function Recorder(canvas) {
@@ -933,10 +1018,7 @@
       camSequence, testSequence, playbackCamSequence, new VideoTrack({
         src: '/assets/videos/short.mov',
         aspect: 16 / 9
-      }), new VideoTrack({
-        src: '/assets/videos/ocean.mp4',
-        aspect: 16 / 9
-      })
+      }), playbackCamSequence
     ]);
     $(window).resize(function() {
       return player.setDimensions();

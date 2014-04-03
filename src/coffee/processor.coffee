@@ -1,0 +1,48 @@
+class window.Processor
+  constructor: (@frames, @faces, @options) ->
+    @newFrames = []
+
+  saturate: (percent) ->
+    @newFrames = []
+    worker = new Worker('/workers/saturate.js')
+
+    worker.addEventListener('message', (e) =>
+      @newFrames.push e.data[0]
+      if @newFrames.length == @frames.length
+        @frames = @newFrames
+        @blur(1)
+    , false)
+
+    @startedAt = new Date().getTime()
+    for frame in @frames
+      worker.postMessage [frame]
+
+  blur: (rate) ->
+    @newFrames = []
+    worker = new Worker('/workers/blur.js')
+
+    worker.addEventListener('message', (e) =>
+      @newFrames.push e.data[0]
+      if @newFrames.length == @frames.length
+        log 'time to add sequence to player'
+        log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
+
+        graySequence = new Sequence
+            type: 'sequence'
+            aspect: 16/9
+            duration: 3
+            src: 'CanvasPlayer'
+            frames: @newFrames
+        graySequence.ended = ->
+          @callback() if @callback?
+          @cleanup()
+          @video.cleanup()
+        player.addTrack graySequence
+        player.addTrack new VideoTrack
+          src: '/assets/videos/ocean.mp4'
+          aspect: 16/9
+    , false)
+
+    @startedAt = new Date().getTime()
+    for frame in @frames
+      worker.postMessage [frame]

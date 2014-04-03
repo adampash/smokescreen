@@ -18,6 +18,5 @@ $ ->
 
   playbackCamSequence.ended = ->
     @callback() if @callback?
-    console.log 'callback and cleanup'
     @cleanup()
     @video.cleanup()

@@ -1,6 +1,7 @@
 $ ->
   class window.Sequence
     constructor: (options) ->
+      @options = options
       @type = 'sequence'
       @src = options.src
       @aspect = options.aspect
@@ -57,7 +58,9 @@ $ ->
           @startSequence()
           @canvases.push @video
         else if @src is 'CanvasPlayer'
-          @video = new CanvasPlayer @canvas, window.recorder.capturedFrames, window.recorder.fps
+          @video = new CanvasPlayer @canvas,
+            @options.frames || window.recorder.capturedFrames,
+            @options.fps || window.recorder.fps
           @video.play(
             player: @player
             ended: =>

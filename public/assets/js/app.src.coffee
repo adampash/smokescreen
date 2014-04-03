@@ -38,9 +38,13 @@ $ ->
           @nextTrack()
       )
 
+    addTrack: (track) ->
+      @tracks.push track
+
 $ ->
   class window.Sequence
     constructor: (options) ->
+      @options = options
       @type = 'sequence'
       @src = options.src
       @aspect = options.aspect
@@ -97,7 +101,9 @@ $ ->
           @startSequence()
           @canvases.push @video
         else if @src is 'CanvasPlayer'
-          @video = new CanvasPlayer @canvas, window.recorder.capturedFrames, window.recorder.fps
+          @video = new CanvasPlayer @canvas,
+            @options.frames || window.recorder.capturedFrames,
+            @options.fps || window.recorder.fps
           @video.play(
             player: @player
             ended: =>
@@ -285,17 +291,16 @@ $ ->
 
     if convert
       complete = =>
-        log 'recording complete'
-        window.converter = new Converter recorder.canvas,
-                            recorder.capturedFrames,
-                            recorder.fps,
-                            null,
-                            converted: ->
-                              log 'converted'
-        # converter.convertAndUpload()
-        converter.runWorker()
+        # window.converter = new Converter recorder.canvas,
+        #                     recorder.capturedFrames,
+        #                     recorder.fps,
+        #                     null,
+        #                     converted: ->
+        # converter.runWorker()
     else
-      complete = null
+      complete = =>
+        @doProcessing(recorder.capturedFrames, recorder.fps)
+
 
     fps = 30
     recorder.record seconds, fps,
@@ -303,6 +308,9 @@ $ ->
 
     recorder
 
+  camSequence.doProcessing = (frames, fps) ->
+    processor = new Processor frames, null, fps
+    processor.saturate()
 
 class window.CanvasPlayer
   constructor: (@canvas, @frames, @fps) ->
@@ -416,9 +424,9 @@ class window.Converter
 
     worker.addEventListener('message', (e) =>
       log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
-      alert 'DONE'
       log 'start processing images now'
       @foundFaces = e.data
+      @options.converted() if @options.converted?
     , false)
 
     framesToProcess = (frame for frame in @frames by 5)
@@ -704,9 +712,57 @@ $ ->
 
   playbackCamSequence.ended = ->
     @callback() if @callback?
-    console.log 'callback and cleanup'
     @cleanup()
     @video.cleanup()
+
+class window.Processor
+  constructor: (@frames, @faces, @options) ->
+    @newFrames = []
+
+  saturate: (percent) ->
+    @newFrames = []
+    worker = new Worker('/workers/saturate.js')
+
+    worker.addEventListener('message', (e) =>
+      @newFrames.push e.data[0]
+      if @newFrames.length == @frames.length
+        @frames = @newFrames
+        @blur(1)
+    , false)
+
+    @startedAt = new Date().getTime()
+    for frame in @frames
+      worker.postMessage [frame]
+
+  blur: (rate) ->
+    @newFrames = []
+    worker = new Worker('/workers/blur.js')
+
+    worker.addEventListener('message', (e) =>
+      @newFrames.push e.data[0]
+      if @newFrames.length == @frames.length
+        log 'time to add sequence to player'
+        log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
+
+        graySequence = new Sequence
+            type: 'sequence'
+            aspect: 16/9
+            duration: 3
+            src: 'CanvasPlayer'
+            frames: @newFrames
+        graySequence.ended = ->
+          @callback() if @callback?
+          @cleanup()
+          @video.cleanup()
+        player.addTrack graySequence
+        player.addTrack new VideoTrack
+          src: '/assets/videos/ocean.mp4'
+          aspect: 16/9
+    , false)
+
+    @startedAt = new Date().getTime()
+    for frame in @frames
+      worker.postMessage [frame]
 
 class window.Recorder
   constructor: (@canvas) ->
@@ -758,10 +814,13 @@ $ ->
         src: '/assets/videos/short.mov'
         aspect: 16/9
     ,
-      new VideoTrack
-        src: '/assets/videos/ocean.mp4'
-        aspect: 16/9
+      playbackCamSequence
     ,
+    # ,
+    #   new VideoTrack
+    #     src: '/assets/videos/ocean.mp4'
+    #     aspect: 16/9
+    # ,
   ]
 
   $(window).resize ->
