@@ -12,13 +12,20 @@ $ ->
 
       @tracks[@currentTrack].setDimensions()
 
-    play: ->
+    play: (trackIndex) ->
       log 'play'
-      if @currentTrack < @tracks.length
+      if trackIndex?
+        @currentTrack = trackIndex
+        @queue @tracks[trackIndex]
+      else if @currentTrack < @tracks.length
         @queue @tracks[@currentTrack]
 
     nextTrack: ->
       @currentTrack++
+      @play()
+
+    prevTrack: ->
+      @currentTrack--
       @play()
 
     queue: (track) ->
@@ -31,3 +38,4 @@ $ ->
 
     addTrack: (track) ->
       @tracks.push track
+      # @play(@tracks.length - 1)

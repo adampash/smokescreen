@@ -1,5 +1,5 @@
 $ ->
-  duration = 3
+  duration = 4
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -24,12 +24,12 @@ $ ->
 
     if convert
       complete = =>
-        # window.converter = new Converter recorder.canvas,
-        #                     recorder.capturedFrames,
-        #                     recorder.fps,
-        #                     null,
-        #                     converted: ->
-        # converter.runWorker()
+        window.converter = new Converter recorder.canvas,
+                            recorder.capturedFrames,
+                            recorder.fps,
+                            null,
+                            converted: ->
+        converter.runWorker()
     else
       complete = =>
         @doProcessing(recorder.capturedFrames, recorder.fps)
@@ -42,5 +42,7 @@ $ ->
     recorder
 
   camSequence.doProcessing = (frames, fps) ->
-    processor = new Processor frames, null, fps
-    processor.saturate()
+    window.processor = new Processor frames, null, fps
+    processor.blackandwhite(overwrite: true)
+    # processor.saturate()
+    # processor.blur()

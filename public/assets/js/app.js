@@ -5,7 +5,7 @@
   $(function() {
     window.dev = true;
     window.log = function(args) {
-      if (dev) {
+      if (false) {
         return console.log.apply(console, arguments);
       }
     };
@@ -29,15 +29,23 @@
         return this.tracks[this.currentTrack].setDimensions();
       };
 
-      Player.prototype.play = function() {
+      Player.prototype.play = function(trackIndex) {
         log('play');
-        if (this.currentTrack < this.tracks.length) {
+        if (trackIndex != null) {
+          this.currentTrack = trackIndex;
+          return this.queue(this.tracks[trackIndex]);
+        } else if (this.currentTrack < this.tracks.length) {
           return this.queue(this.tracks[this.currentTrack]);
         }
       };
 
       Player.prototype.nextTrack = function() {
         this.currentTrack++;
+        return this.play();
+      };
+
+      Player.prototype.prevTrack = function() {
+        this.currentTrack--;
         return this.play();
       };
 
@@ -278,6 +286,9 @@
         var height, spacer;
         height = this.player.displayWidth / this.aspect;
         spacer = (this.player.displayHeight - height) / 2;
+        if (this.littleCanvas != null) {
+          window.spacer = spacer;
+        }
         this.context.drawImage(this.video, 0, spacer, this.player.displayWidth, height);
         if (this.littleCanvas != null) {
           this.littleContext.drawImage(this.video, 0, 0, this.littleCanvas.width, this.littleCanvas.height);
@@ -342,7 +353,7 @@
 
   $(function() {
     var duration;
-    duration = 3;
+    duration = 4;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -369,7 +380,12 @@
       recorder = new Recorder(canvas);
       if (convert) {
         complete = (function(_this) {
-          return function() {};
+          return function() {
+            window.converter = new Converter(recorder.canvas, recorder.capturedFrames, recorder.fps, null, {
+              converted: function() {}
+            });
+            return converter.runWorker();
+          };
         })(this);
       } else {
         complete = (function(_this) {
@@ -385,9 +401,10 @@
       return recorder;
     };
     return camSequence.doProcessing = function(frames, fps) {
-      var processor;
-      processor = new Processor(frames, null, fps);
-      return processor.saturate();
+      window.processor = new Processor(frames, null, fps);
+      return processor.blackandwhite({
+        overwrite: true
+      });
     };
   });
 
@@ -552,6 +569,7 @@
           log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
           log('start processing images now');
           _this.foundFaces = e.data;
+          window.processor.drawFaceRects(_this.foundFaces, window.player.displayWidth / 480);
           if (_this.options.converted != null) {
             return _this.options.converted();
           }
@@ -890,18 +908,90 @@
       this.faces = faces;
       this.options = options;
       this.newFrames = [];
+      this.playFrames = [];
     }
 
+    Processor.prototype.blackandwhite = function(options) {
+      var frame, index, newFrames, worker, _i, _len, _ref, _results;
+      options = options || {};
+      newFrames = [];
+      worker = new Worker('/workers/bnw.js');
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          newFrames.push(e.data[0]);
+          if (newFrames.length === _this.frames.length) {
+            log('time to add sequence to player');
+            log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+            _this.playFrames = newFrames;
+            return _this.addSequence();
+          }
+        };
+      })(this), false);
+      this.startedAt = new Date().getTime();
+      _ref = this.frames;
+      _results = [];
+      for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
+        frame = _ref[index];
+        _results.push(worker.postMessage([frame]));
+      }
+      return _results;
+    };
+
+    Processor.prototype.drawFaceRects = function(faces, scale) {
+      var face, frame, index, newFrames, params, worker, _i, _j, _len, _len1, _ref, _ref1, _results;
+      this.faces = faces;
+      this.scale = scale;
+      newFrames = [];
+      worker = new Worker('/workers/drawFaceRect.js');
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          newFrames.push(e.data[0]);
+          if (newFrames.length === _this.frames.length) {
+            log('time to add sequence to player');
+            log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+            _this.playFrames = newFrames;
+            return _this.addSequence();
+          }
+        };
+      })(this), false);
+      this.startedAt = new Date().getTime();
+      this.newFaces = [];
+      _ref = this.faces;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        face = _ref[_i];
+        this.newFaces.push(face);
+        this.newFaces.push(face);
+        this.newFaces.push(face);
+        this.newFaces.push(face);
+      }
+      _ref1 = this.frames;
+      _results = [];
+      for (index = _j = 0, _len1 = _ref1.length; _j < _len1; index = ++_j) {
+        frame = _ref1[index];
+        params = {
+          frames: [frame],
+          frameNumber: index,
+          faces: this.newFaces[index],
+          scale: scale || 3,
+          spacer: Math.round(window.spacer)
+        };
+        _results.push(worker.postMessage(params));
+      }
+      return _results;
+    };
+
     Processor.prototype.saturate = function(percent) {
-      var frame, worker, _i, _len, _ref, _results;
-      this.newFrames = [];
+      var frame, newFrames, worker, _i, _len, _ref, _results;
+      newFrames = [];
       worker = new Worker('/workers/saturate.js');
       worker.addEventListener('message', (function(_this) {
         return function(e) {
-          _this.newFrames.push(e.data[0]);
-          if (_this.newFrames.length === _this.frames.length) {
-            _this.frames = _this.newFrames;
-            return _this.blur(1);
+          newFrames.push(e.data[0]);
+          if (newFrames.length === _this.frames.length) {
+            log('time to add sequence to player');
+            log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+            _this.playFrames = newFrames;
+            return _this.addSequence();
           }
         };
       })(this), false);
@@ -916,35 +1006,17 @@
     };
 
     Processor.prototype.blur = function(rate) {
-      var frame, worker, _i, _len, _ref, _results;
-      this.newFrames = [];
+      var frame, newFrames, worker, _i, _len, _ref, _results;
+      newFrames = [];
       worker = new Worker('/workers/blur.js');
       worker.addEventListener('message', (function(_this) {
         return function(e) {
-          var graySequence;
-          _this.newFrames.push(e.data[0]);
-          if (_this.newFrames.length === _this.frames.length) {
+          newFrames.push(e.data[0]);
+          if (newFrames.length === _this.frames.length) {
             log('time to add sequence to player');
             log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
-            graySequence = new Sequence({
-              type: 'sequence',
-              aspect: 16 / 9,
-              duration: 3,
-              src: 'CanvasPlayer',
-              frames: _this.newFrames
-            });
-            graySequence.ended = function() {
-              if (this.callback != null) {
-                this.callback();
-              }
-              this.cleanup();
-              return this.video.cleanup();
-            };
-            player.addTrack(graySequence);
-            return player.addTrack(new VideoTrack({
-              src: '/assets/videos/ocean.mp4',
-              aspect: 16 / 9
-            }));
+            _this.playFrames = newFrames;
+            return _this.addSequence();
           }
         };
       })(this), false);
@@ -956,6 +1028,26 @@
         _results.push(worker.postMessage([frame]));
       }
       return _results;
+    };
+
+    Processor.prototype.addSequence = function() {
+      var sequence;
+      sequence = new Sequence({
+        type: 'sequence',
+        aspect: 16 / 9,
+        duration: 3,
+        src: 'CanvasPlayer',
+        frames: this.playFrames
+      });
+      sequence.ended = function() {
+        if (this.callback != null) {
+          this.callback();
+        }
+        this.cleanup();
+        return this.video.cleanup();
+      };
+      player.addTrack(sequence);
+      return log('added track');
     };
 
     return Processor;

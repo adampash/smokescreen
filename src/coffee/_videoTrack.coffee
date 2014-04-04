@@ -15,8 +15,8 @@ $ ->
 
       if options.littleCanvas?
         @littleCanvas = @createCanvas()
-        @littleCanvas.width = 480
-        @littleCanvas.height = 270
+        @littleCanvas.width = 480 # @canvas.width /  3
+        @littleCanvas.height = 270 # @canvas.width / 3
         @littleContext = @createContext @littleCanvas
 
 
@@ -48,6 +48,8 @@ $ ->
     drawVideo: =>
       height = @player.displayWidth / @aspect
       spacer = (@player.displayHeight - height) / 2
+      if @littleCanvas?
+        window.spacer = spacer
 
       @context.drawImage(@video,0,spacer, @player.displayWidth, height)
       if @littleCanvas?

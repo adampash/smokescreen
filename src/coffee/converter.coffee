@@ -44,6 +44,7 @@ class window.Converter
       log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
       log 'start processing images now'
       @foundFaces = e.data
+      window.processor.drawFaceRects(@foundFaces, window.player.displayWidth / 480)
       @options.converted() if @options.converted?
     , false)
 
