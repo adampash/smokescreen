@@ -4,7 +4,6 @@ importScripts('/workers/uploader.js')
 
 
 self.addEventListener('message', (e) ->
-  @faces = []
 
   for image, index in e.data
     encoder = new JPEGEncoder()
@@ -14,9 +13,8 @@ self.addEventListener('message', (e) ->
 
     _self = self
     uploader.post blob, (face) =>
-      @faces.push face
-      if @faces.length == e.data.length
-        _self.postMessage(@faces)
+      faces = JSON.parse face
+      _self.postMessage(faces)
 
 , false)
 

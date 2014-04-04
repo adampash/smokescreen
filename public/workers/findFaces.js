@@ -6,7 +6,6 @@ importScripts('/workers/uploader.js');
 
 self.addEventListener('message', function(e) {
   var blob, encoder, image, index, jpegURI, _i, _len, _ref, _results, _self;
-  this.faces = [];
   _ref = e.data;
   _results = [];
   for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
@@ -17,10 +16,9 @@ self.addEventListener('message', function(e) {
     _self = self;
     _results.push(uploader.post(blob, (function(_this) {
       return function(face) {
-        _this.faces.push(face);
-        if (_this.faces.length === e.data.length) {
-          return _self.postMessage(_this.faces);
-        }
+        var faces;
+        faces = JSON.parse(face);
+        return _self.postMessage(faces);
       };
     })(this)));
   }

@@ -434,17 +434,21 @@ class window.Converter
   runWorker: ->
     worker = new Worker('/workers/findFaces.js')
 
+    framesToProcess = (frame for frame in @frames by 5)
+
+    @foundFaces = []
     worker.addEventListener('message', (e) =>
       log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
       log 'start processing images now'
-      @foundFaces = e.data
-      window.processor.drawFaceRects(@foundFaces, window.player.displayWidth / 480)
-      @options.converted() if @options.converted?
+      @foundFaces.push e.data
+      if @foundFaces.length == framesToProcess.length
+        window.processor.drawFaceRects(@foundFaces, window.player.displayWidth / 480)
+        @options.converted() if @options.converted?
     , false)
 
-    framesToProcess = (frame for frame in @frames by 5)
     @startedAt = new Date().getTime()
-    worker.postMessage framesToProcess
+    for frame in framesToProcess
+      worker.postMessage [frame]
     # for frame in @frames
     #   worker.postMessage frame
     # frame = @frames[10]
@@ -699,6 +703,7 @@ successCallback = (stream) ->
     webcam.src = window.URL.createObjectURL(stream)
   else
     webcam.src = stream
+  $(window).trigger 'click'
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)
@@ -773,6 +778,7 @@ class window.Processor
     @startedAt = new Date().getTime()
     @newFaces = []
     for face in @faces
+      @newFaces.push face
       @newFaces.push face
       @newFaces.push face
       @newFaces.push face
@@ -905,4 +911,3 @@ $ ->
   $(window).on 'click', ->
     $('h1').remove()
     player.play()
-

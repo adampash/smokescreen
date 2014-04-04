@@ -7,14 +7,12 @@ self.addEventListener('message', function(e) {
   this.scale = e.data.scale;
   spacer = e.data.spacer || 0;
   if (e.data.faces != null) {
-    faces = JSON.parse(e.data.faces);
+    faces = e.data.faces;
   }
   this.newFrames = [];
   _ref = this.frames;
   for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
     frame = _ref[index];
-    console.log(frame.width);
-    console.log(frame.height);
     width = frame.width * 4;
     height = frame.height;
     imageData = frame.data;
@@ -28,10 +26,9 @@ self.addEventListener('message', function(e) {
       if (spacer != null) {
         face.y += spacer;
       }
-      console.log(JSON.stringify(face));
       eyebar = {
-        x: face.x,
-        width: face.width,
+        x: Math.round(face.x + face.width / 10),
+        width: Math.round(face.width / 10 * 8),
         y: Math.round(face.y + face.height / 4),
         height: Math.round(face.height / 4)
       };
@@ -44,7 +41,7 @@ self.addEventListener('message', function(e) {
       mouth = {
         x: Math.round(face.x + face.width / 4),
         width: Math.round(face.width / 2),
-        y: Math.round(face.y + (face.height / 4 * 3)),
+        y: Math.round(face.y + (face.height / 5 * 3.5)),
         height: Math.round(face.height / 4)
       };
       for (row = _l = _ref5 = mouth.y, _ref6 = mouth.y + mouth.height; _ref5 <= _ref6 ? _l <= _ref6 : _l >= _ref6; row = _ref5 <= _ref6 ? ++_l : --_l) {

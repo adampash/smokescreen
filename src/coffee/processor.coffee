@@ -47,6 +47,7 @@ class window.Processor
       @newFaces.push face
       @newFaces.push face
       @newFaces.push face
+      @newFaces.push face
     for frame, index in @frames
       params =
         frames: [frame]

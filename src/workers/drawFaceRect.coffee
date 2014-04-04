@@ -7,13 +7,11 @@ self.addEventListener('message', (e) ->
   spacer = e.data.spacer || 0
 
   if e.data.faces?
-    faces = JSON.parse e.data.faces
+    faces = e.data.faces
 
   @newFrames = []
 
   for frame, index in @frames
-    console.log frame.width
-    console.log frame.height
     width = frame.width * 4
     height = frame.height
     imageData = frame.data
@@ -26,10 +24,9 @@ self.addEventListener('message', (e) ->
         face[key] = Math.round(face[key] * scale)
 
       face.y += spacer if spacer?
-      console.log JSON.stringify face
       eyebar =
-        x: face.x
-        width: face.width
+        x: Math.round(face.x + face.width/10)
+        width: Math.round(face.width/10 * 8)
         y: Math.round(face.y + face.height / 4)
         height: Math.round(face.height / 4)
 
@@ -44,7 +41,7 @@ self.addEventListener('message', (e) ->
       mouth =
         x: Math.round(face.x + face.width/4)
         width: Math.round(face.width/2)
-        y: Math.round(face.y + (face.height/4*3))
+        y: Math.round(face.y + (face.height/5*3.5))
         height: Math.round(face.height/4)
 
       for row in [mouth.y..mouth.y+mouth.height]

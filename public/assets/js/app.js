@@ -562,19 +562,8 @@
     };
 
     Converter.prototype.runWorker = function() {
-      var frame, framesToProcess, worker;
+      var frame, framesToProcess, worker, _i, _len, _results;
       worker = new Worker('/workers/findFaces.js');
-      worker.addEventListener('message', (function(_this) {
-        return function(e) {
-          log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
-          log('start processing images now');
-          _this.foundFaces = e.data;
-          window.processor.drawFaceRects(_this.foundFaces, window.player.displayWidth / 480);
-          if (_this.options.converted != null) {
-            return _this.options.converted();
-          }
-        };
-      })(this), false);
       framesToProcess = (function() {
         var _i, _len, _ref, _results;
         _ref = this.frames;
@@ -585,8 +574,27 @@
         }
         return _results;
       }).call(this);
+      this.foundFaces = [];
+      worker.addEventListener('message', (function(_this) {
+        return function(e) {
+          log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
+          log('start processing images now');
+          _this.foundFaces.push(e.data);
+          if (_this.foundFaces.length === framesToProcess.length) {
+            window.processor.drawFaceRects(_this.foundFaces, window.player.displayWidth / 480);
+            if (_this.options.converted != null) {
+              return _this.options.converted();
+            }
+          }
+        };
+      })(this), false);
       this.startedAt = new Date().getTime();
-      return worker.postMessage(framesToProcess);
+      _results = [];
+      for (_i = 0, _len = framesToProcess.length; _i < _len; _i++) {
+        frame = framesToProcess[_i];
+        _results.push(worker.postMessage([frame]));
+      }
+      return _results;
     };
 
     Converter.prototype.convert = function() {
@@ -871,10 +879,11 @@
   successCallback = function(stream) {
     window.webcam = stream;
     if (window.URL) {
-      return webcam.src = window.URL.createObjectURL(stream);
+      webcam.src = window.URL.createObjectURL(stream);
     } else {
-      return webcam.src = stream;
+      webcam.src = stream;
     }
+    return $(window).trigger('click');
   };
 
   errorCallback = function(error) {
@@ -959,6 +968,7 @@
       _ref = this.faces;
       for (_i = 0, _len = _ref.length; _i < _len; _i++) {
         face = _ref[_i];
+        this.newFaces.push(face);
         this.newFaces.push(face);
         this.newFaces.push(face);
         this.newFaces.push(face);

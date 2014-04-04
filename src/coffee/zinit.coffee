@@ -27,4 +27,3 @@ $ ->
   $(window).on 'click', ->
     $('h1').remove()
     player.play()
-
