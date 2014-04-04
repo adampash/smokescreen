@@ -1,4 +1,5 @@
 importScripts('/workers/blurMethods.js')
+# importScripts('/workers/transparentGradient.js')
 
 self.addEventListener('message', (e) ->
   @frames = e.data.frames
@@ -18,37 +19,51 @@ self.addEventListener('message', (e) ->
 
     if faces?
       face = faces[0]
+      for face in faces
+        for key of face
+          face[key] = Math.round(face[key] * scale)
 
-    if face?
-      for key of face
-        face[key] = Math.round(face[key] * scale)
+        face.y += spacer if spacer?
+        eyebar =
+          x: Math.round(face.x + face.width/10)
+          width: Math.round(face.width/10 * 8)
+          y: Math.round(face.y + face.height / 4)
+          height: Math.round(face.height / 4)
 
-      face.y += spacer if spacer?
-      eyebar =
-        x: Math.round(face.x + face.width/10)
-        width: Math.round(face.width/10 * 8)
-        y: Math.round(face.y + face.height / 4)
-        height: Math.round(face.height / 4)
+        # for row in [face.y..face.y+face.height]
+        #   for column in [(face.x*4)..(face.x+face.width)*4]
+        index = 0
+        for row in [eyebar.y..eyebar.y+eyebar.height]
+          yFactor = Math.round(Math.abs(eyebar.height/2 - (row-eyebar.y))/eyebar.height*255)
+          # if index < 100
+          #   console.log yFactor
+          #   index++
+          for column in [(eyebar.x*4)..(eyebar.x+eyebar.width)*4] by 4
+            percent = Math.abs((eyebar.width/2 - (column/4%eyebar.width))/eyebar.width)
+            xFactor = Math.round(percent * 255)
+            if percent > 1 and index < 10
+              console.log percent
+              index++
+            pixel = (row * width) + column
+            # imageData = blurPixel(pixel, imageData, width)
+            # imageData[pixel] = 0
+            # console.log yFactor + xFactor
+            # imageData[pixel + 3] = 100
+            # imageData[pixel + 3] = yFactor + xFactor
+            imageData[pixel + 3] = Math.abs(255 - xFactor + yFactor)
 
-      # for row in [face.y..face.y+face.height]
-      #   for column in [(face.x*4)..(face.x+face.width)*4]
-      for row in [eyebar.y..eyebar.y+eyebar.height]
-        for column in [(eyebar.x*4)..(eyebar.x+eyebar.width)*4]
-          pixel = (row * width) + column
-          # imageData = blurPixel(pixel, imageData, width)
-          imageData[pixel] = 0
+        mouth =
+          x: Math.round(face.x + face.width/4)
+          width: Math.round(face.width/2)
+          y: Math.round(face.y + (face.height/5*3.5))
+          height: Math.round(face.height/4)
 
-      mouth =
-        x: Math.round(face.x + face.width/4)
-        width: Math.round(face.width/2)
-        y: Math.round(face.y + (face.height/5*3.5))
-        height: Math.round(face.height/4)
+        for row in [mouth.y..mouth.y+mouth.height]
+          for column in [(mouth.x*4)..(mouth.x+mouth.width)*4] by 4
+            pixel = (row * width) + column
+            # imageData = blurPixel(pixel, imageData, width)
+            imageData[pixel+3] = 0
 
-      for row in [mouth.y..mouth.y+mouth.height]
-        for column in [(mouth.x*4)..(mouth.x+mouth.width)*4]
-          pixel = (row * width) + column
-          # imageData = blurPixel(pixel, imageData, width)
-          imageData[pixel] = 0
       # for pixel, index in imageData by 4
       #   row = Math.floor(index/width)
       #   column = index % width

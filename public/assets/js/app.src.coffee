@@ -47,7 +47,8 @@ $ ->
 
     addTrack: (track) ->
       @tracks.push track
-      # @play(@tracks.length - 1)
+      if @currentTrack == @tracks.length - 1
+        @play(@tracks.length - 1)
 
 $ ->
   class window.Sequence
@@ -276,7 +277,7 @@ $ ->
       context = canvas.getContext '2d'
 
 $ ->
-  duration = 4
+  duration = 1
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -751,21 +752,20 @@ class window.Processor
 
         @playFrames = newFrames
         @addSequence()
+      else
+        worker.postMessage [@frames[newFrames.length]]
     , false)
 
     @startedAt = new Date().getTime()
-    for frame, index in @frames
-      worker.postMessage [frame]
-
-    # if options.overwrite
-    #   @frames = newFrames
+    # for frame, index in @frames
+    worker.postMessage [@frames[0]]
 
 
   drawFaceRects: (@faces, @scale) ->
     newFrames = []
-    worker = new Worker('/workers/drawFaceRect.js')
+    @worker = new Worker('/workers/drawFaceRect.js')
 
-    worker.addEventListener('message', (e) =>
+    @worker.addEventListener('message', (e) =>
       newFrames.push e.data[0]
       if newFrames.length == @frames.length
         log 'time to add sequence to player'
@@ -773,6 +773,8 @@ class window.Processor
 
         @playFrames = newFrames
         @addSequence()
+      else
+        @sendFrame newFrames.length, scale
     , false)
 
     @startedAt = new Date().getTime()
@@ -783,14 +785,18 @@ class window.Processor
       @newFaces.push face
       @newFaces.push face
       @newFaces.push face
-    for frame, index in @frames
-      params =
-        frames: [frame]
-        frameNumber: index
-        faces: @newFaces[index]
-        scale: scale || 3
-        spacer: Math.round(window.spacer)
-      worker.postMessage params
+
+    @sendFrame 0, scale
+
+  sendFrame: (index, scale) ->
+    frame = @frames[index]
+    params =
+      frames: [frame]
+      frameNumber: index
+      faces: @newFaces[index]
+      scale: scale || 3
+      spacer: Math.round(window.spacer)
+    @worker.postMessage params
 
   saturate: (percent) ->
     newFrames = []

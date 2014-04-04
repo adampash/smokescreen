@@ -59,7 +59,10 @@
       };
 
       Player.prototype.addTrack = function(track) {
-        return this.tracks.push(track);
+        this.tracks.push(track);
+        if (this.currentTrack === this.tracks.length - 1) {
+          return this.play(this.tracks.length - 1);
+        }
       };
 
       return Player;
@@ -353,7 +356,7 @@
 
   $(function() {
     var duration;
-    duration = 4;
+    duration = 1;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -921,7 +924,7 @@
     }
 
     Processor.prototype.blackandwhite = function(options) {
-      var frame, index, newFrames, worker, _i, _len, _ref, _results;
+      var newFrames, worker;
       options = options || {};
       newFrames = [];
       worker = new Worker('/workers/bnw.js');
@@ -933,26 +936,22 @@
             log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
             _this.playFrames = newFrames;
             return _this.addSequence();
+          } else {
+            return worker.postMessage([_this.frames[newFrames.length]]);
           }
         };
       })(this), false);
       this.startedAt = new Date().getTime();
-      _ref = this.frames;
-      _results = [];
-      for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
-        frame = _ref[index];
-        _results.push(worker.postMessage([frame]));
-      }
-      return _results;
+      return worker.postMessage([this.frames[0]]);
     };
 
     Processor.prototype.drawFaceRects = function(faces, scale) {
-      var face, frame, index, newFrames, params, worker, _i, _j, _len, _len1, _ref, _ref1, _results;
+      var face, newFrames, _i, _len, _ref;
       this.faces = faces;
       this.scale = scale;
       newFrames = [];
-      worker = new Worker('/workers/drawFaceRect.js');
-      worker.addEventListener('message', (function(_this) {
+      this.worker = new Worker('/workers/drawFaceRect.js');
+      this.worker.addEventListener('message', (function(_this) {
         return function(e) {
           newFrames.push(e.data[0]);
           if (newFrames.length === _this.frames.length) {
@@ -960,6 +959,8 @@
             log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
             _this.playFrames = newFrames;
             return _this.addSequence();
+          } else {
+            return _this.sendFrame(newFrames.length, scale);
           }
         };
       })(this), false);
@@ -974,20 +975,20 @@
         this.newFaces.push(face);
         this.newFaces.push(face);
       }
-      _ref1 = this.frames;
-      _results = [];
-      for (index = _j = 0, _len1 = _ref1.length; _j < _len1; index = ++_j) {
-        frame = _ref1[index];
-        params = {
-          frames: [frame],
-          frameNumber: index,
-          faces: this.newFaces[index],
-          scale: scale || 3,
-          spacer: Math.round(window.spacer)
-        };
-        _results.push(worker.postMessage(params));
-      }
-      return _results;
+      return this.sendFrame(0, scale);
+    };
+
+    Processor.prototype.sendFrame = function(index, scale) {
+      var frame, params;
+      frame = this.frames[index];
+      params = {
+        frames: [frame],
+        frameNumber: index,
+        faces: this.newFaces[index],
+        scale: scale || 3,
+        spacer: Math.round(window.spacer)
+      };
+      return this.worker.postMessage(params);
     };
 
     Processor.prototype.saturate = function(percent) {

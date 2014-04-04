@@ -38,4 +38,5 @@ $ ->
 
     addTrack: (track) ->
       @tracks.push track
-      # @play(@tracks.length - 1)
+      if @currentTrack == @tracks.length - 1
+        @play(@tracks.length - 1)
