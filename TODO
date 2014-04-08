@@ -1,7 +1,15 @@
 TODO
-* remove logs from background
-* Background workers:
-  http://www.html5rocks.com/en/tutorials/workers/basics/
+* To create accurate face map:
+  x Calculate average face size
+  x Ditch any face that is 50% or below avg face size
+  * Starting at 1st frame, loop through faces and find closest face in next frame
+    * If face is within 2/3 face size of previous face, assume it's the same face
+    * If no match found in next frame, try following frame and so on
+    * If a match is found, connect them, null out current face, then repeat on new face until end
+
+  * If a face has fewer than a threshold of recognition, remove it
+  * Fill in the blanks with iterative movement between last known location and previous known location
+
 * Adjust sequence to display size (so, for example, green rectangle scales to video)
 
 

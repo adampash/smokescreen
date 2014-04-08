@@ -47,10 +47,8 @@ self.addEventListener('message', (e) ->
             pixel = (row * width) + column
             # imageData = blurPixel(pixel, imageData, width)
             # imageData[pixel] = 0
-            # console.log yFactor + xFactor
-            # imageData[pixel + 3] = 100
-            # imageData[pixel + 3] = yFactor + xFactor
-            imageData[pixel + 3] = Math.abs(255 - xFactor + yFactor)
+            # imageData[pixel + 3] = Math.abs(255 - xFactor + yFactor)
+            imageData[pixel + 3] = 0
 
         mouth =
           x: Math.round(face.x + face.width/4)

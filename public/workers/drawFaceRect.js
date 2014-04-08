@@ -43,7 +43,7 @@ self.addEventListener('message', function(e) {
               index++;
             }
             pixel = (row * width) + column;
-            imageData[pixel + 3] = Math.abs(255 - xFactor + yFactor);
+            imageData[pixel + 3] = 0;
           }
         }
         mouth = {
