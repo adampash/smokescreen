@@ -365,14 +365,16 @@
       this.facesByFrames = faces;
     }
 
-    Faces.prototype.groupFaces2 = function(frames, faces) {
+    Faces.prototype.groupFaces = function(frames, faces) {
       var firstFace, frameNumber, i, thisFace;
+      if (frames == null) {
+        this.removeAnomolies();
+      }
       frames = frames || this.reconstruct();
       faces = faces || [];
       frameNumber = frameNumber || 0;
       thisFace = new Face();
       faces.push(thisFace);
-      console.log(faces);
       firstFace = false;
       i = 0;
       while (!(firstFace || i > frames.length)) {
@@ -385,14 +387,13 @@
         }
       }
       thisFace.frames.push(firstFace);
-      console.log('we have our first face', thisFace);
-      thisFace.findRelatives(frames);
+      if (!this.empty(frames)) {
+        thisFace.findRelatives(frames);
+      }
       if (this.empty(frames)) {
-        console.log('i guess it is empty', frames);
         return faces;
       } else {
-        console.log('find a new face!');
-        return this.groupFaces2(frames, faces);
+        return this.groupFaces(frames, faces);
       }
     };
 
@@ -400,96 +401,13 @@
       var empty, i;
       i = 0;
       empty = true;
-      while (empty || i < arrayOfArrays.length) {
-        console.log(arrayOfArrays[i].length);
+      while (empty && i < arrayOfArrays.length) {
         if (arrayOfArrays[i].length > 0) {
           empty = false;
         }
         i++;
       }
       return empty;
-    };
-
-    Faces.prototype.groupFaces = function(frames, faces, thisFace, frameNumber, started, currentFace) {
-      var closestFace, face, index, nextFrame, thisFrame, _i, _len;
-      if (frames == null) {
-        this.removeAnomolies();
-      }
-      frames = frames || this.reconstruct();
-      faces = faces || [];
-      frameNumber = frameNumber || 0;
-      if (thisFace == null) {
-        thisFace = new Face();
-        faces.push(thisFace);
-      }
-      if (frames[frameNumber] == null) {
-        console.log('done', faces);
-        return faces;
-      }
-      thisFrame = frames[frameNumber];
-      if (currentFace == null) {
-        if (thisFrame[0] != null) {
-          currentFace = thisFrame[0];
-          thisFrame.splice(0, 1);
-        } else {
-          currentFace = void 0;
-        }
-      }
-      if (!thisFace.isBegun()) {
-        console.log('push currentFace', currentFace);
-        thisFace.frames.push(currentFace);
-      }
-      if (currentFace != null) {
-        closestFace = false;
-        while (!(closestFace || frameNumber > frames.length)) {
-          if (frames[frameNumber + 1] != null) {
-            nextFrame = frames[frameNumber + 1];
-            if (nextFrame.length) {
-              closestFace = this.findClosestFaceIn(nextFrame, face);
-            } else {
-              console.log('push undefined', 'undefined');
-              thisFace.frames.push(void 0);
-              frameNumber++;
-            }
-          } else {
-            return faces;
-          }
-        }
-        console.log(currentFace);
-        if (Math.abs(1 - currentFace.width / closestFace.width) < 0.6 && this.distance(currentFace, closestFace) < currentFace.width * 0.6) {
-          console.log('push closestFace', closestFace);
-          thisFace.frames.push(closestFace);
-          for (index = _i = 0, _len = nextFrame.length; _i < _len; index = ++_i) {
-            face = nextFrame[index];
-            if (face === closestFace) {
-              console.log('we have a match at ', index, face);
-              nextFrame.splice(index, 1);
-            }
-          }
-          console.log("it's a match");
-          this.groupFaces(frames, faces, thisFace, frameNumber + 1, true, closestFace);
-        }
-      } else {
-        console.log('push empty');
-        thisFace.frames[frameNumber + 1] = void 0;
-      }
-      if (frameNumber < frames.length) {
-        return this.groupFaces(frames, faces, thisFace, frameNumber + 1, true);
-      }
-    };
-
-    Faces.prototype.distance = function(obj1, obj2) {
-      return Math.sqrt(Math.pow(obj1.x - obj2.x, 2) + Math.pow(obj1.y - obj2.y, 2));
-    };
-
-    Faces.prototype.findClosestFaceIn = function(faces, newFace) {
-      var sorted;
-      sorted = faces.sort((function(_this) {
-        return function(a, b) {
-          return _this.distance(a, newFace) - _this.distance(b, newFace);
-        };
-      })(this));
-      return sorted[0];
     };
 
     Faces.prototype.removeAnomolies = function() {
@@ -582,9 +500,7 @@
           this.frames.push(void 0);
         }
       }
-      console.log('we have our next frame', nextFrame);
       closestFaces = this.findClosestFaceIn(nextFrame);
-      console.log('sorted possible matches are', closestFaces);
       bestMatch = this.returnBestMatch(closestFaces);
       console.log("bestMatch is", bestMatch);
       if (bestMatch) {
@@ -605,10 +521,12 @@
       match = false;
       i = 0;
       while (!(match || i > faces.length)) {
-        testFace = faces[i];
-        if (Math.abs(1 - face.width / testFace.width) < 0.6 && this.distance(face, testFace) < face.width * 0.6) {
-          faces.splice(i, 1);
-          match = testFace;
+        if (faces[i] != null) {
+          testFace = faces[i];
+          if (Math.abs(1 - face.width / testFace.width) < 0.6 && this.distance(face, testFace) < face.width * 0.6) {
+            faces.splice(i, 1);
+            match = testFace;
+          }
         }
         i++;
       }
@@ -619,7 +537,7 @@
       var face, i;
       i = 1;
       face = false;
-      while (!(face || i < 0)) {
+      while (!(face || i > this.frames.length)) {
         face = this.frames[this.frames.length - i];
         i++;
       }
