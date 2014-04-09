@@ -50,11 +50,11 @@ class window.Converter
       if @foundFaces.length == framesToProcess.length
         window.matchedFaces = new Faces(@foundFaces)
         bestBets = matchedFaces.groupFaces()
-        if bestBets[0].isBegun()
-          console.log bestBets
+        if bestBets[0]? and bestBets[0].isBegun()
           for face in bestBets
             face.fillInBlanks(3)
-          window.processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), window.player.displayWidth / 480)
+            processor.zoomOnFace(face)
+          processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
         else
           console.log 'no go'
         @options.converted() if @options.converted?

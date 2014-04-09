@@ -12,12 +12,6 @@ $ ->
         aspect: 16/9
     ,
       playbackCamSequence
-    ,
-    # ,
-    #   new VideoTrack
-    #     src: '/assets/videos/ocean.mp4'
-    #     aspect: 16/9
-    # ,
   ]
 
   $(window).resize ->

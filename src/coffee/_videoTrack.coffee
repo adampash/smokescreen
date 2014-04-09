@@ -15,8 +15,8 @@ $ ->
 
       if options.littleCanvas?
         @littleCanvas = @createCanvas()
-        @littleCanvas.width = 480 # @canvas.width /  3
-        @littleCanvas.height = 270 # @canvas.width / 3
+        @littleCanvas.width = 960 # @canvas.width /  3
+        @littleCanvas.height = 540 # @canvas.width / 3
         @littleContext = @createContext @littleCanvas
 
 

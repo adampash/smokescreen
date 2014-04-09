@@ -3,6 +3,16 @@ class window.Processor
     @newFrames = []
     @playFrames = []
 
+  zoomOnFace: (face) ->
+    centerFace = face.frames[6]
+    # TODO face.averageFace
+    crop = new Cropper
+      width: player.displayWidth
+      height: player.displayHeight
+    frames = @frames.map (frame) ->
+      crop.zoomToFit(centerFace, frame)
+    @addSequence frames
+
   blackandwhite: (options) ->
     options = options || {}
     newFrames = []
@@ -35,8 +45,7 @@ class window.Processor
         log 'time to add sequence to player'
         log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
 
-        @playFrames = newFrames
-        @addSequence()
+        @addSequence(newFrames)
       else
         @sendFrame newFrames.length, scale
     , false)
@@ -44,12 +53,6 @@ class window.Processor
     @startedAt = new Date().getTime()
     # @newFaces = []
     @newFaces = @faces
-    # for face in @faces
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
 
     @sendFrame 0, scale
 
@@ -99,13 +102,14 @@ class window.Processor
     for frame in @frames
       worker.postMessage [frame]
 
-  addSequence: ->
+  addSequence: (frames) ->
+    frames = frames || @playFrames
     sequence = new Sequence
         type: 'sequence'
         aspect: 16/9
         duration: 3
         src: 'CanvasPlayer'
-        frames: @playFrames
+        frames: frames
     sequence.ended = ->
       @callback() if @callback?
       @cleanup()

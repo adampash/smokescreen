@@ -255,8 +255,8 @@
         this.shouldDraw = options.shouldDraw || true;
         if (options.littleCanvas != null) {
           this.littleCanvas = this.createCanvas();
-          this.littleCanvas.width = 480;
-          this.littleCanvas.height = 270;
+          this.littleCanvas.width = 960;
+          this.littleCanvas.height = 540;
           this.littleContext = this.createContext(this.littleCanvas);
         }
       }
@@ -355,7 +355,8 @@
   });
 
   window.Faces = (function() {
-    function Faces(faces) {
+    function Faces(faces, scale) {
+      this.scale = scale;
       if (faces.length != null) {
         this.allFaces = this.flatten(faces);
       } else {
@@ -367,9 +368,6 @@
 
     Faces.prototype.groupFaces = function(frames, faces) {
       var firstFace, frameNumber, i, thisFace;
-      if (frames == null) {
-        this.removeAnomolies();
-      }
       frames = frames || this.reconstruct();
       faces = faces || [];
       frameNumber = frameNumber || 0;
@@ -391,11 +389,58 @@
         thisFace.findRelatives(frames);
       }
       if (this.empty(frames)) {
+        faces = this.verifyFrameNumbers(faces, frames.length);
+        faces = this.removeProbableFalse(faces);
         this.faceMap = faces;
         return faces;
       } else {
         return this.groupFaces(frames, faces);
       }
+    };
+
+    Faces.prototype.applyScale = function(faces) {
+      var face, frame, key, _i, _j, _len, _len1;
+      for (_i = 0, _len = faces.length; _i < _len; _i++) {
+        face = faces[_i];
+        for (_j = 0, _len1 = face.length; _j < _len1; _j++) {
+          frame = face[_j];
+          for (key in frame) {
+            frame[key] = Math.round(frame[key] * this.scale);
+          }
+        }
+      }
+      return faces;
+    };
+
+    Faces.prototype.removeProbableFalse = function(faces) {
+      var face, newFaces, _i, _len;
+      newFaces = [];
+      for (_i = 0, _len = faces.length; _i < _len; _i++) {
+        face = faces[_i];
+        console.log(face.probability());
+        if (face.probability() > 0.2) {
+          newFaces.push(face);
+        } else {
+          console.log('removing ', face);
+        }
+      }
+      return newFaces;
+    };
+
+    Faces.prototype.verifyFrameNumbers = function(faces, numFrames) {
+      var fixedFaces;
+      console.log('all faces should have ' + numFrames + ' frames');
+      fixedFaces = faces.map(function(face) {
+        if (face.frames.length < numFrames) {
+          while (face.frames.length !== numFrames) {
+            face.frames.push(void 0);
+          }
+        } else if (face.frames.length > numFrames) {
+          face.frames.splice(numFrames, -1);
+        }
+        return face;
+      });
+      return fixedFaces;
     };
 
     Faces.prototype.empty = function(arrayOfArrays) {
@@ -439,7 +484,7 @@
       for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
         face = _ref[index];
         if (!face.frame) {
-          if (Math.abs(1 - face.width * face.height / this.avgFace) < 0.5) {
+          if (Math.abs(1 - face.width * face.height / this.avgFace) < 0.6) {
             goodFaces.push(face);
             newNumFaces++;
           }
@@ -447,6 +492,7 @@
           goodFaces.push(face);
         }
       }
+      console.log('started with ' + this.allFaces.length + ' and ending with ' + goodFaces.length);
       this.allFaces = goodFaces;
       return this.numFaces = newNumFaces;
     };
@@ -510,6 +556,23 @@
       this.frames = [];
       this.started = null;
     }
+
+    Face.prototype.probability = function() {
+      return 1 - this.emptyFrames() / this.frames.length;
+    };
+
+    Face.prototype.emptyFrames = function() {
+      var frame, numEmpty, _i, _len, _ref;
+      numEmpty = 0;
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        if (frame === void 0 || frame === false) {
+          numEmpty++;
+        }
+      }
+      return numEmpty;
+    };
 
     Face.prototype.padFrames = function(padding) {
       var frame, newFrames, num, _i, _j, _len, _ref;
@@ -622,7 +685,7 @@
       } else {
         this.frames.push(void 0);
       }
-      if (this.frames.length !== frames.length) {
+      if (this.frames.length < frames.length) {
         return this.findRelatives(frames);
       } else {
         return this;
@@ -631,18 +694,20 @@
 
     Face.prototype.returnBestMatch = function(faces) {
       var face, i, match, testFace;
-      face = this.getLatestFace();
       match = false;
-      i = 0;
-      while (!(match || i > faces.length)) {
-        if (faces[i] != null) {
-          testFace = faces[i];
-          if (Math.abs(1 - face.width / testFace.width) < 0.6 && this.distance(face, testFace) < face.width * 0.6) {
-            faces.splice(i, 1);
-            match = testFace;
+      if ((faces != null) && faces.length > 0) {
+        face = this.getLatestFace();
+        i = 0;
+        while (!(match || i > faces.length)) {
+          if (faces[i] != null) {
+            testFace = faces[i];
+            if (Math.abs(1 - face.width / testFace.width) < 0.6 && this.distance(face, testFace) < face.width * 0.6) {
+              faces.splice(i, 1);
+              match = testFace;
+            }
           }
+          i++;
         }
-        i++;
       }
       return match;
     };
@@ -700,7 +765,7 @@
 
   $(function() {
     var duration;
-    duration = 3;
+    duration = 1;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -710,13 +775,18 @@
         return this.recordCam(duration);
       }
     });
-    camSequence.drawAnimation = function(context, elapsed) {};
+    camSequence.drawAnimation = function(context, elapsed) {
+      return $('body').append('<div class="cover"></div>');
+    };
     camSequence.ended = function() {
       if (this.callback != null) {
         this.callback();
       }
       this.cleanup();
-      return this.video.cleanup();
+      this.video.cleanup();
+      return setTimeout(function() {
+        return $('.cover').remove();
+      }, 500);
     };
     camSequence.recordCam = function(seconds) {
       window.recorder = this.record(this.video.canvas, seconds, false);
@@ -931,13 +1001,13 @@
           if (_this.foundFaces.length === framesToProcess.length) {
             window.matchedFaces = new Faces(_this.foundFaces);
             bestBets = matchedFaces.groupFaces();
-            if (bestBets[0].isBegun()) {
-              console.log(bestBets);
+            if ((bestBets[0] != null) && bestBets[0].isBegun()) {
               for (_i = 0, _len = bestBets.length; _i < _len; _i++) {
                 face = bestBets[_i];
                 face.fillInBlanks(3);
+                processor.zoomOnFace(face);
               }
-              window.processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), window.player.displayWidth / 480);
+              processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960);
             } else {
               console.log('no go');
             }
@@ -1223,6 +1293,87 @@
 
   })();
 
+  window.Cropper = (function() {
+    function Cropper(goalDimensions) {
+      this.goalDimensions = goalDimensions;
+      this.transitionCanvas = this.createCanvas(this.goalDimensions);
+      this.transitionContext = this.createContext(this.transitionCanvas);
+      this.goalCanvas = this.createCanvas(this.goalDimensions);
+      this.goalContext = this.createContext(this.goalCanvas);
+    }
+
+    Cropper.prototype.zoomToFit = function(face, frame) {
+      var canvas, cropCoords, cropData, scaleFactor;
+      cropCoords = this.convertFaceCoords(face);
+      this.transitionContext.putImageData(frame, 0, 0);
+      cropData = this.transitionContext.getImageData(cropCoords.x, cropCoords.y, cropCoords.width, cropCoords.height);
+      scaleFactor = this.goalDimensions.width / cropCoords.width;
+      canvas = this.createCanvas({
+        width: cropData.width,
+        height: cropData.height
+      });
+      this.createContext(canvas).putImageData(cropData, 0, 0);
+      this.goalContext.scale(scaleFactor, scaleFactor);
+      this.goalContext.drawImage(canvas, 0, 0);
+      this.goalContext.scale(1 / scaleFactor, 1 / scaleFactor);
+      return this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
+    };
+
+    Cropper.prototype.convertFaceCoords = function(face) {
+      var center_x, center_y, height, newCoords, width;
+      width = face.width * 4;
+      height = width * 9 / 16;
+      center_x = face.x + face.width / 2;
+      center_y = face.y + face.height / 2;
+      return newCoords = {
+        x: Math.round(center_x - width / 2),
+        y: Math.round(center_y + height / 1.2),
+        width: Math.round(width),
+        height: Math.round(height)
+      };
+    };
+
+    Cropper.prototype.createCanvas = function(dimensions) {
+      var canvas;
+      canvas = document.createElement('canvas');
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
+      return canvas;
+    };
+
+    Cropper.prototype.createContext = function(canvas) {
+      var context;
+      return context = canvas.getContext('2d');
+    };
+
+    return Cropper;
+
+  })();
+
+  window.debug = {
+    frame: function(frame) {
+      var canvas, context;
+      canvas = this.createCanvas({
+        width: frame.width,
+        height: frame.height
+      });
+      $('body').html(canvas);
+      context = this.createContext(canvas);
+      return context.putImageData(frame, 0, 0);
+    },
+    createCanvas: function(dimensions) {
+      var canvas;
+      canvas = document.createElement('canvas');
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
+      return canvas;
+    },
+    createContext: function(canvas) {
+      var context;
+      return context = canvas.getContext('2d');
+    }
+  };
+
   navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
 
   constraints = {
@@ -1242,7 +1393,9 @@
     } else {
       webcam.src = stream;
     }
-    return $(window).trigger('click');
+    return setTimeout(function() {
+      return $(window).trigger('click');
+    }, 500);
   };
 
   errorCallback = function(error) {
@@ -1279,6 +1432,19 @@
       this.playFrames = [];
     }
 
+    Processor.prototype.zoomOnFace = function(face) {
+      var centerFace, crop, frames;
+      centerFace = face.frames[6];
+      crop = new Cropper({
+        width: player.displayWidth,
+        height: player.displayHeight
+      });
+      frames = this.frames.map(function(frame) {
+        return crop.zoomToFit(centerFace, frame);
+      });
+      return this.addSequence(frames);
+    };
+
     Processor.prototype.blackandwhite = function(options) {
       var newFrames, worker;
       options = options || {};
@@ -1313,8 +1479,7 @@
           if (newFrames.length === _this.frames.length) {
             log('time to add sequence to player');
             log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
-            _this.playFrames = newFrames;
-            return _this.addSequence();
+            return _this.addSequence(newFrames);
           } else {
             return _this.sendFrame(newFrames.length, scale);
           }
@@ -1388,14 +1553,15 @@
       return _results;
     };
 
-    Processor.prototype.addSequence = function() {
+    Processor.prototype.addSequence = function(frames) {
       var sequence;
+      frames = frames || this.playFrames;
       sequence = new Sequence({
         type: 'sequence',
         aspect: 16 / 9,
         duration: 3,
         src: 'CanvasPlayer',
-        frames: this.playFrames
+        frames: frames
       });
       sequence.ended = function() {
         if (this.callback != null) {

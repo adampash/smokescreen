@@ -1,5 +1,5 @@
 $ ->
-  duration = 3
+  duration = 1
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -9,11 +9,15 @@ $ ->
         @recordCam(duration)
 
   camSequence.drawAnimation = (context, elapsed) ->
+    $('body').append '<div class="cover"></div>'
 
   camSequence.ended = ->
     @callback() if @callback?
     @cleanup()
     @video.cleanup()
+    setTimeout ->
+      $('.cover').remove()
+    , 500
 
   camSequence.recordCam = (seconds) ->
     window.recorder = @record(@video.canvas, seconds, false)

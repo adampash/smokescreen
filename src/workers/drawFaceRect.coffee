@@ -39,15 +39,16 @@ self.addEventListener('message', (e) ->
           #   console.log yFactor
           #   index++
           for column in [(eyebar.x*4)..(eyebar.x+eyebar.width)*4] by 4
-            percent = Math.abs((eyebar.width/2 - (column/4%eyebar.width))/eyebar.width)
+            percent = Math.abs((eyebar.width/2 - (column/4%eyebar.width))/eyebar.width / 2)
             xFactor = Math.round(percent * 255)
-            if percent > 1 and index < 10
+            if percent > 0.9 and index < 10
               console.log percent
               index++
             pixel = (row * width) + column
             # imageData = blurPixel(pixel, imageData, width)
             # imageData[pixel] = 0
-            # imageData[pixel + 3] = Math.abs(255 - xFactor + yFactor)
+            # alpha = Math.abs(255 - xFactor + yFactor)
+            # imageData[pixel + 3] = alpha
             imageData[pixel + 3] = 0
 
         mouth =

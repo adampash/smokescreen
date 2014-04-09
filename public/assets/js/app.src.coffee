@@ -203,8 +203,8 @@ $ ->
 
       if options.littleCanvas?
         @littleCanvas = @createCanvas()
-        @littleCanvas.width = 480 # @canvas.width /  3
-        @littleCanvas.height = 270 # @canvas.width / 3
+        @littleCanvas.width = 960 # @canvas.width /  3
+        @littleCanvas.height = 540 # @canvas.width / 3
         @littleContext = @createContext @littleCanvas
 
 
@@ -277,7 +277,7 @@ $ ->
       context = canvas.getContext '2d'
 
 class window.Faces
-  constructor: (faces) ->
+  constructor: (faces, @scale) ->
     if faces.length?
       @allFaces = @flatten faces
     else
@@ -287,8 +287,8 @@ class window.Faces
     @facesByFrames = faces
 
   groupFaces: (frames, faces) ->
-    if !frames?
-      @removeAnomolies()
+    # if !frames?
+    #   @removeAnomolies()
     frames = frames || @reconstruct()
     faces = faces || []
     frameNumber = frameNumber || 0
@@ -315,10 +315,41 @@ class window.Faces
     # check if frames still has faces in it
     # if it does, tail recurse this method
     if @empty(frames)
+      faces = @verifyFrameNumbers(faces, frames.length)
+      faces = @removeProbableFalse(faces)
+      # faces = @applyScale(faces)
       @faceMap = faces
       faces
     else
       @groupFaces(frames, faces)
+
+  applyScale: (faces) ->
+    for face in faces
+      for frame in face
+        for key of frame
+          frame[key] = Math.round(frame[key] * @scale)
+    faces
+
+  removeProbableFalse: (faces) ->
+    newFaces = []
+    for face in faces
+      console.log face.probability()
+      if face.probability() > 0.2
+        newFaces.push face
+      else
+        console.log 'removing ', face
+    newFaces
+
+  verifyFrameNumbers: (faces, numFrames) ->
+    console.log 'all faces should have ' + numFrames + ' frames'
+    fixedFaces = faces.map (face) ->
+      if face.frames.length < numFrames
+        until face.frames.length == numFrames
+          face.frames.push undefined
+      else if face.frames.length > numFrames
+        face.frames.splice(numFrames, -1)
+      face
+    fixedFaces
 
   empty: (arrayOfArrays) ->
     i = 0
@@ -343,11 +374,14 @@ class window.Faces
     newNumFaces = 0
     for face, index in @allFaces
       if !face.frame
-        if Math.abs(1 - face.width*face.height / @avgFace) < 0.5
+        # face size is within x% of avg face size
+        if Math.abs(1 - face.width*face.height / @avgFace) < 0.6
           goodFaces.push face
           newNumFaces++
       else
         goodFaces.push face
+
+    console.log 'started with ' + @allFaces.length + ' and ending with ' + goodFaces.length
     @allFaces = goodFaces
     @numFaces = newNumFaces
 
@@ -390,6 +424,16 @@ class window.Face
   constructor: () ->
     @frames = []
     @started = null
+
+  probability: ->
+    1 - @emptyFrames() / @frames.length
+
+  emptyFrames: ->
+    numEmpty = 0
+    for frame in @frames
+      numEmpty++ if frame is undefined or frame is false
+
+    numEmpty
 
   padFrames: (padding) ->
     newFrames = []
@@ -483,25 +527,26 @@ class window.Face
     else
       @frames.push undefined
 
-    if @frames.length != frames.length
+    if @frames.length < frames.length
       @findRelatives(frames)
     else
       @
 
   returnBestMatch: (faces) ->
-    face = @getLatestFace()
-
     match = false
 
-    i = 0
-    until match or i > faces.length
-      if faces[i]?
-        testFace = faces[i]
-        if Math.abs(1 - face.width / testFace.width) < 0.6 and 
-                            @distance(face, testFace) < face.width * 0.6
-          faces.splice(i, 1)
-          match = testFace
-      i++
+    if faces? and faces.length > 0
+      face = @getLatestFace()
+
+      i = 0
+      until match or i > faces.length
+        if faces[i]?
+          testFace = faces[i]
+          if Math.abs(1 - face.width / testFace.width) < 0.6 and 
+                              @distance(face, testFace) < face.width * 0.6
+            faces.splice(i, 1)
+            match = testFace
+        i++
     return match
 
   getLatestFace: ->
@@ -540,7 +585,7 @@ class window.Face
       return false
 
 $ ->
-  duration = 3
+  duration = 1
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -550,11 +595,15 @@ $ ->
         @recordCam(duration)
 
   camSequence.drawAnimation = (context, elapsed) ->
+    $('body').append '<div class="cover"></div>'
 
   camSequence.ended = ->
     @callback() if @callback?
     @cleanup()
     @video.cleanup()
+    setTimeout ->
+      $('.cover').remove()
+    , 500
 
   camSequence.recordCam = (seconds) ->
     window.recorder = @record(@video.canvas, seconds, false)
@@ -708,11 +757,11 @@ class window.Converter
       if @foundFaces.length == framesToProcess.length
         window.matchedFaces = new Faces(@foundFaces)
         bestBets = matchedFaces.groupFaces()
-        if bestBets[0].isBegun()
-          console.log bestBets
+        if bestBets[0]? and bestBets[0].isBegun()
           for face in bestBets
             face.fillInBlanks(3)
-          window.processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), window.player.displayWidth / 480)
+            processor.zoomOnFace(face)
+          processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
         else
           console.log 'no go'
         @options.converted() if @options.converted?
@@ -959,6 +1008,78 @@ class window.Converter
   appendToForm: (index, file) ->
     @formdata.append("upload[" + index + "]", file)
 
+class window.Cropper
+  constructor: (@goalDimensions) ->
+    @transitionCanvas = @createCanvas @goalDimensions
+    @transitionContext = @createContext @transitionCanvas
+
+    @goalCanvas = @createCanvas @goalDimensions
+    @goalContext = @createContext @goalCanvas
+
+  zoomToFit: (face, frame) ->
+    cropCoords = @convertFaceCoords face
+    @transitionContext.putImageData frame, 0, 0
+    cropData = @transitionContext.getImageData cropCoords.x,
+                                   cropCoords.y,
+                                   cropCoords.width,
+                                   cropCoords.height
+
+    scaleFactor = @goalDimensions.width/cropCoords.width
+    canvas = @createCanvas
+                width: cropData.width
+                height: cropData.height
+    @createContext(canvas).putImageData cropData, 0, 0
+
+    @goalContext.scale scaleFactor, scaleFactor
+    @goalContext.drawImage canvas, 0, 0
+
+    @goalContext.scale 1/scaleFactor, 1/scaleFactor
+    @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+
+  convertFaceCoords: (face) ->
+    width = face.width * 4
+    height = width * 9/16
+    center_x = face.x + face.width / 2
+    center_y = face.y + face.height / 2
+    # console.log 'center_x', center_x
+    newCoords =
+      x: Math.round center_x - width/2
+      y: Math.round center_y + height/1.2
+      width: Math.round width
+      height: Math.round height
+
+
+
+
+  createCanvas: (dimensions) ->
+    canvas = document.createElement 'canvas'
+    canvas.width = dimensions.width
+    canvas.height = dimensions.height
+    canvas
+
+  createContext: (canvas) ->
+    context = canvas.getContext '2d'
+
+
+window.debug =
+  frame: (frame) ->
+    canvas = @createCanvas
+              width: frame.width
+              height: frame.height
+    $('body').html canvas
+    context = @createContext canvas
+    context.putImageData frame, 0, 0
+
+  createCanvas: (dimensions) ->
+    canvas = document.createElement 'canvas'
+    canvas.width = dimensions.width
+    canvas.height = dimensions.height
+    canvas
+
+  createContext: (canvas) ->
+    context = canvas.getContext '2d'
+
+
 # GET USER MEDIA
 navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia
 
@@ -975,7 +1096,9 @@ successCallback = (stream) ->
     webcam.src = window.URL.createObjectURL(stream)
   else
     webcam.src = stream
-  $(window).trigger 'click'
+  setTimeout ->
+    $(window).trigger 'click'
+  , 500
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)
@@ -1010,6 +1133,16 @@ class window.Processor
     @newFrames = []
     @playFrames = []
 
+  zoomOnFace: (face) ->
+    centerFace = face.frames[6]
+    # TODO face.averageFace
+    crop = new Cropper
+      width: player.displayWidth
+      height: player.displayHeight
+    frames = @frames.map (frame) ->
+      crop.zoomToFit(centerFace, frame)
+    @addSequence frames
+
   blackandwhite: (options) ->
     options = options || {}
     newFrames = []
@@ -1042,8 +1175,7 @@ class window.Processor
         log 'time to add sequence to player'
         log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
 
-        @playFrames = newFrames
-        @addSequence()
+        @addSequence(newFrames)
       else
         @sendFrame newFrames.length, scale
     , false)
@@ -1051,12 +1183,6 @@ class window.Processor
     @startedAt = new Date().getTime()
     # @newFaces = []
     @newFaces = @faces
-    # for face in @faces
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
-    #   @newFaces.push face
 
     @sendFrame 0, scale
 
@@ -1106,13 +1232,14 @@ class window.Processor
     for frame in @frames
       worker.postMessage [frame]
 
-  addSequence: ->
+  addSequence: (frames) ->
+    frames = frames || @playFrames
     sequence = new Sequence
         type: 'sequence'
         aspect: 16/9
         duration: 3
         src: 'CanvasPlayer'
-        frames: @playFrames
+        frames: frames
     sequence.ended = ->
       @callback() if @callback?
       @cleanup()
@@ -1174,12 +1301,6 @@ $ ->
         aspect: 16/9
     ,
       playbackCamSequence
-    ,
-    # ,
-    #   new VideoTrack
-    #     src: '/assets/videos/ocean.mp4'
-    #     aspect: 16/9
-    # ,
   ]
 
   $(window).resize ->

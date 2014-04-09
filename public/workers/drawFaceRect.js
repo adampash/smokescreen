@@ -36,9 +36,9 @@ self.addEventListener('message', function(e) {
         for (row = _k = _ref1 = eyebar.y, _ref2 = eyebar.y + eyebar.height; _ref1 <= _ref2 ? _k <= _ref2 : _k >= _ref2; row = _ref1 <= _ref2 ? ++_k : --_k) {
           yFactor = Math.round(Math.abs(eyebar.height / 2 - (row - eyebar.y)) / eyebar.height * 255);
           for (column = _l = _ref3 = eyebar.x * 4, _ref4 = (eyebar.x + eyebar.width) * 4; _l <= _ref4; column = _l += 4) {
-            percent = Math.abs((eyebar.width / 2 - (column / 4 % eyebar.width)) / eyebar.width);
+            percent = Math.abs((eyebar.width / 2 - (column / 4 % eyebar.width)) / eyebar.width / 2);
             xFactor = Math.round(percent * 255);
-            if (percent > 1 && index < 10) {
+            if (percent > 0.9 && index < 10) {
               console.log(percent);
               index++;
             }

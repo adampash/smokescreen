@@ -1,5 +1,5 @@
 class window.Faces
-  constructor: (faces) ->
+  constructor: (faces, @scale) ->
     if faces.length?
       @allFaces = @flatten faces
     else
@@ -9,8 +9,8 @@ class window.Faces
     @facesByFrames = faces
 
   groupFaces: (frames, faces) ->
-    if !frames?
-      @removeAnomolies()
+    # if !frames?
+    #   @removeAnomolies()
     frames = frames || @reconstruct()
     faces = faces || []
     frameNumber = frameNumber || 0
@@ -37,10 +37,41 @@ class window.Faces
     # check if frames still has faces in it
     # if it does, tail recurse this method
     if @empty(frames)
+      faces = @verifyFrameNumbers(faces, frames.length)
+      faces = @removeProbableFalse(faces)
+      # faces = @applyScale(faces)
       @faceMap = faces
       faces
     else
       @groupFaces(frames, faces)
+
+  applyScale: (faces) ->
+    for face in faces
+      for frame in face
+        for key of frame
+          frame[key] = Math.round(frame[key] * @scale)
+    faces
+
+  removeProbableFalse: (faces) ->
+    newFaces = []
+    for face in faces
+      console.log face.probability()
+      if face.probability() > 0.2
+        newFaces.push face
+      else
+        console.log 'removing ', face
+    newFaces
+
+  verifyFrameNumbers: (faces, numFrames) ->
+    console.log 'all faces should have ' + numFrames + ' frames'
+    fixedFaces = faces.map (face) ->
+      if face.frames.length < numFrames
+        until face.frames.length == numFrames
+          face.frames.push undefined
+      else if face.frames.length > numFrames
+        face.frames.splice(numFrames, -1)
+      face
+    fixedFaces
 
   empty: (arrayOfArrays) ->
     i = 0
@@ -65,11 +96,14 @@ class window.Faces
     newNumFaces = 0
     for face, index in @allFaces
       if !face.frame
-        if Math.abs(1 - face.width*face.height / @avgFace) < 0.5
+        # face size is within x% of avg face size
+        if Math.abs(1 - face.width*face.height / @avgFace) < 0.6
           goodFaces.push face
           newNumFaces++
       else
         goodFaces.push face
+
+    console.log 'started with ' + @allFaces.length + ' and ending with ' + goodFaces.length
     @allFaces = goodFaces
     @numFaces = newNumFaces
 
@@ -112,6 +146,16 @@ class window.Face
   constructor: () ->
     @frames = []
     @started = null
+
+  probability: ->
+    1 - @emptyFrames() / @frames.length
+
+  emptyFrames: ->
+    numEmpty = 0
+    for frame in @frames
+      numEmpty++ if frame is undefined or frame is false
+
+    numEmpty
 
   padFrames: (padding) ->
     newFrames = []
@@ -205,25 +249,26 @@ class window.Face
     else
       @frames.push undefined
 
-    if @frames.length != frames.length
+    if @frames.length < frames.length
       @findRelatives(frames)
     else
       @
 
   returnBestMatch: (faces) ->
-    face = @getLatestFace()
-
     match = false
 
-    i = 0
-    until match or i > faces.length
-      if faces[i]?
-        testFace = faces[i]
-        if Math.abs(1 - face.width / testFace.width) < 0.6 and 
-                            @distance(face, testFace) < face.width * 0.6
-          faces.splice(i, 1)
-          match = testFace
-      i++
+    if faces? and faces.length > 0
+      face = @getLatestFace()
+
+      i = 0
+      until match or i > faces.length
+        if faces[i]?
+          testFace = faces[i]
+          if Math.abs(1 - face.width / testFace.width) < 0.6 and 
+                              @distance(face, testFace) < face.width * 0.6
+            faces.splice(i, 1)
+            match = testFace
+        i++
     return match
 
   getLatestFace: ->
