@@ -37,6 +37,7 @@ class window.Faces
     # check if frames still has faces in it
     # if it does, tail recurse this method
     if @empty(frames)
+      @faceMap = faces
       faces
     else
       @groupFaces(frames, faces)
@@ -44,10 +45,20 @@ class window.Faces
   empty: (arrayOfArrays) ->
     i = 0
     empty = true
+    console.log 'checking for empty'
     while empty and i < arrayOfArrays.length
       empty = false if arrayOfArrays[i].length > 0
       i++
     empty
+
+  prepareForCanvas: (faces) ->
+    frames = []
+    for face in faces
+      for frame, index in face.frames
+        frames[index] = [] unless frames[index]?
+        frames[index].push frame if frame?
+    frames
+
 
   removeAnomolies: ->
     goodFaces = []
@@ -102,16 +113,90 @@ class window.Face
     @frames = []
     @started = null
 
+  padFrames: (padding) ->
+    newFrames = []
+    for frame in @frames
+      newFrames.push frame
+      for num in [padding..0]
+        newFrames.push undefined
+
+    @frames = newFrames
+
+
+  fillInBlanks: (padding) ->
+    if padding?
+      @padFrames(padding)
+    i = 0
+    for frame, index in @frames
+      if frame is undefined
+        @fillIn(index)
+
+        i++
+    console.log 'we have ' + i + ' frames that need filling in'
+
+  fillIn: (index) ->
+    if index is 0
+      # find first match and fill in with it
+      match = false
+      i = 1
+      until match
+        match = @frames[index+i] unless @frames[index+i] is undefined
+        i++
+      @frames[index] = match
+
+    else if index is @frames.length - 1
+      @frames[index] = @frames[index-1]
+      #only go backward
+    else
+      # go in both directions
+      lastFrame = @frames[index-1]
+      match = false
+      i = 1
+      until match or index+i >= @frames.length
+        unless @frames[index+i] is undefined
+          match = @frames[index+i] 
+        else
+          i++
+      if match
+        @fillBetween(index-1, index+i)
+        # @frames[index] = match
+      else
+        @frames[index] = lastFrame
+
+  fillBetween: (index1, index2) ->
+    numFrames = index2 - index1
+    firstFrame = @frames[index1]
+    lastFrame = @frames[index2]
+
+    xDiff = firstFrame.x - lastFrame.x
+    yDiff = firstFrame.y - lastFrame.y
+    widthDiff = firstFrame.width - lastFrame.width
+
+    applyDiff =
+      x: Math.round xDiff / numFrames
+      y: Math.round yDiff / numFrames
+      width: Math.round widthDiff / numFrames
+
+    i = index1+1
+    until i == index2
+      @frames[i] =
+        x: @frames[i-1].x - applyDiff.x
+        y: @frames[i-1].y - applyDiff.y
+        width: @frames[i-1].width - applyDiff.width
+        height: @frames[i-1].height - applyDiff.width
+      i++
+
+
   findRelatives: (frames) ->
     # add the first face available in the array of frames
     nextFrame = false
     until nextFrame || @frames.length > frames.length
-      if frames[@frames.length].length
+      if frames[@frames.length]? and frames[@frames.length].length
         nextFrame = frames[@frames.length]
       else
         @frames.push undefined
 
-    closestFaces = @findClosestFaceIn(nextFrame)
+    closestFaces = @findClosestFaceIn(nextFrame) if nextFrame
 
     bestMatch = @returnBestMatch(closestFaces)
     console.log "bestMatch is", bestMatch
@@ -166,75 +251,12 @@ class window.Face
     return @started if @started?
     if @frames.length > 0
       for frame in @frames
-        if frame?
+        if frame? and frame
           @started = true
           return @started
 
-      false
+      console.log 'false'
+      return false
 
     else
-      false
-
-
-# class window.Face
-#   constructor: (@x, @y, @area) ->
-#     @avg =
-#       x: @x
-#       y: @y
-#       area: @area
-#     @locations = []
-#     @locations.push(
-#       x: @x
-#       y: @y
-#       area: @area
-#     )
-#     @certainty = 0
-# 
-#   newPosition: (@x, @y, @area) ->
-#     @locations.push
-#       x: @x
-#       y: @y
-#       area: @area
-# 
-# 
-#   averageArea: ->
-#     avgArea = (@locations.reduce((a, b, c, d) ->
-#       a + b.area
-#     , 0) / @locations.length)
-#     avgArea
-# 
-#   standardDeviation: ->
-#     avg = @averageArea()
-#     distances = @locations.map (obj, index) ->
-#       Math.pow(avg - obj.area, 2)
-#     variance = distances.reduce((a, b) ->
-#       a + b
-#     , 0) / distances.length
-#     Math.sqrt(variance)
-# 
-#   calculateCertainty: (maxLocations) ->
-#     @certainty = @locations.length / maxLocations
-# 
-# 
-# # function findFaces() {
-# #   window.faceCollection = new Faces();
-# #   faceCoords.forEach(function(obj, index) {
-# #     obj.forEach(function(face, index) {
-# #       if (faceCollection.faces.length == 0) {
-# #         faceCollection.faces.push(new Face(face.x, face.y, face.width * face.height));
-# #       }
-# #       if (faceCollection.faces.length > 0) {
-# #         possibleMatch = closestFace(faceCollection.faces, face);
-# #         if (distance(possibleMatch, face) < Math.sqrt(possibleMatch.area) / 5) {
-# #           if (possibleMatch.area - (face.width * face.height) < possibleMatch.standardDeviation()) {
-# #             possibleMatch.newPosition(face.x, face.y, face.width * face.height);
-# #           }
-# #         }
-# #           else {
-# #             faceCollection.faces.push(new Face(face.x, face.y, face.width * face.height));
-# #           }
-# #       }
-# #     });
-# #   });
-# #   faceCollection.calculateCertainties();
-# # }
+      return false

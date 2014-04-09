@@ -48,7 +48,15 @@ class window.Converter
       log 'start processing images now'
       @foundFaces.push e.data
       if @foundFaces.length == framesToProcess.length
-        window.processor.drawFaceRects(@foundFaces, window.player.displayWidth / 480)
+        window.matchedFaces = new Faces(@foundFaces)
+        bestBets = matchedFaces.groupFaces()
+        if bestBets[0].isBegun()
+          console.log bestBets
+          for face in bestBets
+            face.fillInBlanks(3)
+          window.processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), window.player.displayWidth / 480)
+        else
+          console.log 'no go'
         @options.converted() if @options.converted?
     , false)
 

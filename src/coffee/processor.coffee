@@ -42,13 +42,14 @@ class window.Processor
     , false)
 
     @startedAt = new Date().getTime()
-    @newFaces = []
-    for face in @faces
-      @newFaces.push face
-      @newFaces.push face
-      @newFaces.push face
-      @newFaces.push face
-      @newFaces.push face
+    # @newFaces = []
+    @newFaces = @faces
+    # for face in @faces
+    #   @newFaces.push face
+    #   @newFaces.push face
+    #   @newFaces.push face
+    #   @newFaces.push face
+    #   @newFaces.push face
 
     @sendFrame 0, scale
 

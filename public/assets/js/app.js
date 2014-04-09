@@ -391,6 +391,7 @@
         thisFace.findRelatives(frames);
       }
       if (this.empty(frames)) {
+        this.faceMap = faces;
         return faces;
       } else {
         return this.groupFaces(frames, faces);
@@ -401,6 +402,7 @@
       var empty, i;
       i = 0;
       empty = true;
+      console.log('checking for empty');
       while (empty && i < arrayOfArrays.length) {
         if (arrayOfArrays[i].length > 0) {
           empty = false;
@@ -408,6 +410,25 @@
         i++;
       }
       return empty;
+    };
+
+    Faces.prototype.prepareForCanvas = function(faces) {
+      var face, frame, frames, index, _i, _j, _len, _len1, _ref;
+      frames = [];
+      for (_i = 0, _len = faces.length; _i < _len; _i++) {
+        face = faces[_i];
+        _ref = face.frames;
+        for (index = _j = 0, _len1 = _ref.length; _j < _len1; index = ++_j) {
+          frame = _ref[index];
+          if (frames[index] == null) {
+            frames[index] = [];
+          }
+          if (frame != null) {
+            frames[index].push(frame);
+          }
+        }
+      }
+      return frames;
     };
 
     Faces.prototype.removeAnomolies = function() {
@@ -490,17 +511,110 @@
       this.started = null;
     }
 
+    Face.prototype.padFrames = function(padding) {
+      var frame, newFrames, num, _i, _j, _len, _ref;
+      newFrames = [];
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        newFrames.push(frame);
+        for (num = _j = padding; padding <= 0 ? _j <= 0 : _j >= 0; num = padding <= 0 ? ++_j : --_j) {
+          newFrames.push(void 0);
+        }
+      }
+      return this.frames = newFrames;
+    };
+
+    Face.prototype.fillInBlanks = function(padding) {
+      var frame, i, index, _i, _len, _ref;
+      if (padding != null) {
+        this.padFrames(padding);
+      }
+      i = 0;
+      _ref = this.frames;
+      for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
+        frame = _ref[index];
+        if (frame === void 0) {
+          this.fillIn(index);
+          i++;
+        }
+      }
+      return console.log('we have ' + i + ' frames that need filling in');
+    };
+
+    Face.prototype.fillIn = function(index) {
+      var i, lastFrame, match;
+      if (index === 0) {
+        match = false;
+        i = 1;
+        while (!match) {
+          if (this.frames[index + i] !== void 0) {
+            match = this.frames[index + i];
+          }
+          i++;
+        }
+        return this.frames[index] = match;
+      } else if (index === this.frames.length - 1) {
+        return this.frames[index] = this.frames[index - 1];
+      } else {
+        lastFrame = this.frames[index - 1];
+        match = false;
+        i = 1;
+        while (!(match || index + i >= this.frames.length)) {
+          if (this.frames[index + i] !== void 0) {
+            match = this.frames[index + i];
+          } else {
+            i++;
+          }
+        }
+        if (match) {
+          return this.fillBetween(index - 1, index + i);
+        } else {
+          return this.frames[index] = lastFrame;
+        }
+      }
+    };
+
+    Face.prototype.fillBetween = function(index1, index2) {
+      var applyDiff, firstFrame, i, lastFrame, numFrames, widthDiff, xDiff, yDiff, _results;
+      numFrames = index2 - index1;
+      firstFrame = this.frames[index1];
+      lastFrame = this.frames[index2];
+      xDiff = firstFrame.x - lastFrame.x;
+      yDiff = firstFrame.y - lastFrame.y;
+      widthDiff = firstFrame.width - lastFrame.width;
+      applyDiff = {
+        x: Math.round(xDiff / numFrames),
+        y: Math.round(yDiff / numFrames),
+        width: Math.round(widthDiff / numFrames)
+      };
+      i = index1 + 1;
+      _results = [];
+      while (i !== index2) {
+        this.frames[i] = {
+          x: this.frames[i - 1].x - applyDiff.x,
+          y: this.frames[i - 1].y - applyDiff.y,
+          width: this.frames[i - 1].width - applyDiff.width,
+          height: this.frames[i - 1].height - applyDiff.width
+        };
+        _results.push(i++);
+      }
+      return _results;
+    };
+
     Face.prototype.findRelatives = function(frames) {
       var bestMatch, closestFaces, nextFrame;
       nextFrame = false;
       while (!(nextFrame || this.frames.length > frames.length)) {
-        if (frames[this.frames.length].length) {
+        if ((frames[this.frames.length] != null) && frames[this.frames.length].length) {
           nextFrame = frames[this.frames.length];
         } else {
           this.frames.push(void 0);
         }
       }
-      closestFaces = this.findClosestFaceIn(nextFrame);
+      if (nextFrame) {
+        closestFaces = this.findClosestFaceIn(nextFrame);
+      }
       bestMatch = this.returnBestMatch(closestFaces);
       console.log("bestMatch is", bestMatch);
       if (bestMatch) {
@@ -568,11 +682,12 @@
         _ref = this.frames;
         for (_i = 0, _len = _ref.length; _i < _len; _i++) {
           frame = _ref[_i];
-          if (frame != null) {
+          if ((frame != null) && frame) {
             this.started = true;
             return this.started;
           }
         }
+        console.log('false');
         return false;
       } else {
         return false;
@@ -585,7 +700,7 @@
 
   $(function() {
     var duration;
-    duration = 1;
+    duration = 3;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -809,11 +924,23 @@
       this.foundFaces = [];
       worker.addEventListener('message', (function(_this) {
         return function(e) {
+          var bestBets, face, _i, _len;
           log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
           log('start processing images now');
           _this.foundFaces.push(e.data);
           if (_this.foundFaces.length === framesToProcess.length) {
-            window.processor.drawFaceRects(_this.foundFaces, window.player.displayWidth / 480);
+            window.matchedFaces = new Faces(_this.foundFaces);
+            bestBets = matchedFaces.groupFaces();
+            if (bestBets[0].isBegun()) {
+              console.log(bestBets);
+              for (_i = 0, _len = bestBets.length; _i < _len; _i++) {
+                face = bestBets[_i];
+                face.fillInBlanks(3);
+              }
+              window.processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), window.player.displayWidth / 480);
+            } else {
+              console.log('no go');
+            }
             if (_this.options.converted != null) {
               return _this.options.converted();
             }
@@ -1175,7 +1302,7 @@
     };
 
     Processor.prototype.drawFaceRects = function(faces, scale) {
-      var face, newFrames, _i, _len, _ref;
+      var newFrames;
       this.faces = faces;
       this.scale = scale;
       newFrames = [];
@@ -1194,16 +1321,7 @@
         };
       })(this), false);
       this.startedAt = new Date().getTime();
-      this.newFaces = [];
-      _ref = this.faces;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        face = _ref[_i];
-        this.newFaces.push(face);
-        this.newFaces.push(face);
-        this.newFaces.push(face);
-        this.newFaces.push(face);
-        this.newFaces.push(face);
-      }
+      this.newFaces = this.faces;
       return this.sendFrame(0, scale);
     };
 
