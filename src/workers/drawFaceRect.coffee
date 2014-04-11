@@ -13,6 +13,7 @@ self.addEventListener('message', (e) ->
   @newFrames = []
 
   for frame, index in @frames
+    console.log 'wtf', frame, index, frames unless frame?
     width = frame.width * 4
     height = frame.height
     imageData = frame.data
@@ -20,8 +21,8 @@ self.addEventListener('message', (e) ->
     if faces?
       face = faces[0]
       for face in faces
-        for key of face
-          face[key] = Math.round(face[key] * scale)
+        # for key of face
+        #   face[key] = Math.round(face[key] * scale)
 
         face.y += spacer if spacer?
         eyebar =

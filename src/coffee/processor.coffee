@@ -4,14 +4,18 @@ class window.Processor
     @playFrames = []
 
   zoomOnFace: (face) ->
+    return if !face.frames? or face.frames.length < 7
     centerFace = face.frames[6]
     # TODO face.averageFace
     crop = new Cropper
       width: player.displayWidth
       height: player.displayHeight
-    frames = @frames.map (frame) ->
-      crop.zoomToFit(centerFace, frame)
-    @addSequence frames
+    # frames = @frames.map (frame) ->
+      # crop.zoomToFit(centerFace, frame)
+    crop.queue(centerFace, @frames)
+    crop.start (frames) =>
+      console.log 'done'
+      @addSequence frames, true
 
   blackandwhite: (options) ->
     options = options || {}
@@ -57,14 +61,17 @@ class window.Processor
     @sendFrame 0, scale
 
   sendFrame: (index, scale) ->
+    #TODO Debug when frame is undefined here...
     frame = @frames[index]
-    params =
-      frames: [frame]
-      frameNumber: index
-      faces: @newFaces[index]
-      scale: scale || 3
-      spacer: Math.round(window.spacer)
-    @worker.postMessage params
+    debugger unless frame?
+    if frame?
+      params =
+        frames: [frame]
+        frameNumber: index
+        faces: @newFaces[index]
+        scale: scale || 3
+        spacer: Math.round(window.spacer)
+      @worker.postMessage params
 
   saturate: (percent) ->
     newFrames = []
@@ -102,14 +109,16 @@ class window.Processor
     for frame in @frames
       worker.postMessage [frame]
 
-  addSequence: (frames) ->
+  addSequence: (frames, addSpacer) ->
     frames = frames || @playFrames
+    addSpacer = addSpacer || false
     sequence = new Sequence
         type: 'sequence'
         aspect: 16/9
         duration: 3
         src: 'CanvasPlayer'
         frames: frames
+        addSpacer: addSpacer
     sequence.ended = ->
       @callback() if @callback?
       @cleanup()

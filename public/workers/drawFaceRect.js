@@ -1,7 +1,7 @@
 importScripts('/workers/blurMethods.js');
 
 self.addEventListener('message', function(e) {
-  var column, eyebar, face, faces, frame, height, imageData, index, key, mouth, percent, pixel, row, spacer, width, xFactor, yFactor, _i, _j, _k, _l, _len, _len1, _m, _n, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
+  var column, eyebar, face, faces, frame, height, imageData, index, mouth, percent, pixel, row, spacer, width, xFactor, yFactor, _i, _j, _k, _l, _len, _len1, _m, _n, _ref, _ref1, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8;
   this.frames = e.data.frames;
   this.frameNumber = e.data.frameNumber;
   this.scale = e.data.scale;
@@ -13,6 +13,9 @@ self.addEventListener('message', function(e) {
   _ref = this.frames;
   for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
     frame = _ref[index];
+    if (frame == null) {
+      console.log('wtf', frame, index, frames);
+    }
     width = frame.width * 4;
     height = frame.height;
     imageData = frame.data;
@@ -20,9 +23,6 @@ self.addEventListener('message', function(e) {
       face = faces[0];
       for (_j = 0, _len1 = faces.length; _j < _len1; _j++) {
         face = faces[_j];
-        for (key in face) {
-          face[key] = Math.round(face[key] * scale);
-        }
         if (spacer != null) {
           face.y += spacer;
         }

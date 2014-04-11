@@ -60,7 +60,8 @@ $ ->
         else if @src is 'CanvasPlayer'
           @video = new CanvasPlayer @canvas,
             @options.frames || window.recorder.capturedFrames,
-            @options.fps || window.recorder.fps
+            @options.fps || window.recorder.fps,
+            addSpacer: @options.addSpacer || false
           @video.play(
             player: @player
             ended: =>

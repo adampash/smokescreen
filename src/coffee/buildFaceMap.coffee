@@ -9,8 +9,8 @@ class window.Faces
     @facesByFrames = faces
 
   groupFaces: (frames, faces) ->
-    # if !frames?
-    #   @removeAnomolies()
+    if !frames?
+      @removeAnomolies()
     frames = frames || @reconstruct()
     faces = faces || []
     frameNumber = frameNumber || 0
@@ -39,7 +39,7 @@ class window.Faces
     if @empty(frames)
       faces = @verifyFrameNumbers(faces, frames.length)
       faces = @removeProbableFalse(faces)
-      # faces = @applyScale(faces)
+      faces = @applyScale(faces)
       @faceMap = faces
       faces
     else
@@ -47,16 +47,14 @@ class window.Faces
 
   applyScale: (faces) ->
     for face in faces
-      for frame in face
-        for key of frame
-          frame[key] = Math.round(frame[key] * @scale)
+      face.applyScale(@scale)
     faces
 
   removeProbableFalse: (faces) ->
     newFaces = []
     for face in faces
       console.log face.probability()
-      if face.probability() > 0.2
+      if face.probability() > 0.18
         newFaces.push face
       else
         console.log 'removing ', face
@@ -97,7 +95,7 @@ class window.Faces
     for face, index in @allFaces
       if !face.frame
         # face size is within x% of avg face size
-        if Math.abs(1 - face.width*face.height / @avgFace) < 0.6
+        if Math.abs(1 - face.width*face.height / @avgFace) < 0.7
           goodFaces.push face
           newNumFaces++
       else
@@ -146,6 +144,13 @@ class window.Face
   constructor: () ->
     @frames = []
     @started = null
+
+
+  applyScale: (scale) ->
+    for frame in @frames
+      for key of frame
+        frame[key] = Math.round(frame[key] * scale)
+    @
 
   probability: ->
     1 - @emptyFrames() / @frames.length

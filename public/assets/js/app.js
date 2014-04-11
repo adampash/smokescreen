@@ -141,7 +141,9 @@
             this.startSequence();
             return this.canvases.push(this.video);
           } else if (this.src === 'CanvasPlayer') {
-            this.video = new CanvasPlayer(this.canvas, this.options.frames || window.recorder.capturedFrames, this.options.fps || window.recorder.fps);
+            this.video = new CanvasPlayer(this.canvas, this.options.frames || window.recorder.capturedFrames, this.options.fps || window.recorder.fps, {
+              addSpacer: this.options.addSpacer || false
+            });
             return this.video.play({
               player: this.player,
               ended: (function(_this) {
@@ -368,6 +370,9 @@
 
     Faces.prototype.groupFaces = function(frames, faces) {
       var firstFace, frameNumber, i, thisFace;
+      if (frames == null) {
+        this.removeAnomolies();
+      }
       frames = frames || this.reconstruct();
       faces = faces || [];
       frameNumber = frameNumber || 0;
@@ -391,6 +396,7 @@
       if (this.empty(frames)) {
         faces = this.verifyFrameNumbers(faces, frames.length);
         faces = this.removeProbableFalse(faces);
+        faces = this.applyScale(faces);
         this.faceMap = faces;
         return faces;
       } else {
@@ -399,15 +405,10 @@
     };
 
     Faces.prototype.applyScale = function(faces) {
-      var face, frame, key, _i, _j, _len, _len1;
+      var face, _i, _len;
       for (_i = 0, _len = faces.length; _i < _len; _i++) {
         face = faces[_i];
-        for (_j = 0, _len1 = face.length; _j < _len1; _j++) {
-          frame = face[_j];
-          for (key in frame) {
-            frame[key] = Math.round(frame[key] * this.scale);
-          }
-        }
+        face.applyScale(this.scale);
       }
       return faces;
     };
@@ -418,7 +419,7 @@
       for (_i = 0, _len = faces.length; _i < _len; _i++) {
         face = faces[_i];
         console.log(face.probability());
-        if (face.probability() > 0.2) {
+        if (face.probability() > 0.18) {
           newFaces.push(face);
         } else {
           console.log('removing ', face);
@@ -484,7 +485,7 @@
       for (index = _i = 0, _len = _ref.length; _i < _len; index = ++_i) {
         face = _ref[index];
         if (!face.frame) {
-          if (Math.abs(1 - face.width * face.height / this.avgFace) < 0.6) {
+          if (Math.abs(1 - face.width * face.height / this.avgFace) < 0.7) {
             goodFaces.push(face);
             newNumFaces++;
           }
@@ -556,6 +557,18 @@
       this.frames = [];
       this.started = null;
     }
+
+    Face.prototype.applyScale = function(scale) {
+      var frame, key, _i, _len, _ref;
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        for (key in frame) {
+          frame[key] = Math.round(frame[key] * scale);
+        }
+      }
+      return this;
+    };
 
     Face.prototype.probability = function() {
       return 1 - this.emptyFrames() / this.frames.length;
@@ -765,7 +778,7 @@
 
   $(function() {
     var duration;
-    duration = 1;
+    duration = 4;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -826,11 +839,13 @@
   });
 
   window.CanvasPlayer = (function() {
-    function CanvasPlayer(canvas, frames, fps) {
+    function CanvasPlayer(canvas, frames, fps, options) {
       this.canvas = canvas;
       this.frames = frames;
       this.fps = fps;
-      this.options = {};
+      this.options = options;
+      this.options = this.options || {};
+      this.addSpacer = this.options.addSpacer;
       this.paused = false;
       this.context = this.canvas.getContext('2d');
       this.index = 0;
@@ -904,13 +919,18 @@
     };
 
     CanvasPlayer.prototype.paintFrame = function(index) {
-      var frame;
+      var frame, spacer;
       if (index >= this.frames.length || index < 0) {
         return false;
       }
       this.index = index || this.index;
       frame = this.frames[this.index];
-      this.context.putImageData(frame, 0, 0);
+      if (this.addSpacer) {
+        spacer = Math.round((this.canvas.height - frame.width * 9 / 16) / 2);
+        this.context.putImageData(frame, 0, spacer);
+      } else {
+        this.context.putImageData(frame, 0, 0);
+      }
       if (this.options.progress) {
         return this.options.progress();
       }
@@ -999,7 +1019,7 @@
           log('start processing images now');
           _this.foundFaces.push(e.data);
           if (_this.foundFaces.length === framesToProcess.length) {
-            window.matchedFaces = new Faces(_this.foundFaces);
+            window.matchedFaces = new Faces(_this.foundFaces, player.displayWidth / 960);
             bestBets = matchedFaces.groupFaces();
             if ((bestBets[0] != null) && bestBets[0].isBegun()) {
               for (_i = 0, _len = bestBets.length; _i < _len; _i++) {
@@ -1296,11 +1316,33 @@
   window.Cropper = (function() {
     function Cropper(goalDimensions) {
       this.goalDimensions = goalDimensions;
+      this.spacer = (this.goalDimensions.height - this.goalDimensions.width * 9 / 16) / 2;
       this.transitionCanvas = this.createCanvas(this.goalDimensions);
       this.transitionContext = this.createContext(this.transitionCanvas);
       this.goalCanvas = this.createCanvas(this.goalDimensions);
       this.goalContext = this.createContext(this.goalCanvas);
     }
+
+    Cropper.prototype.queue = function(face, frames) {
+      this.frameQueue = frames;
+      this.currentFace = face;
+      return this.finishedFrames = [];
+    };
+
+    Cropper.prototype.start = function(callback) {
+      console.log('running cropper');
+      this.doneCallback = callback || this.doneCallback;
+      this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift()));
+      if (this.frameQueue.length > 0) {
+        return setTimeout((function(_this) {
+          return function() {
+            return _this.start();
+          };
+        })(this), 10);
+      } else {
+        return this.doneCallback(this.finishedFrames);
+      }
+    };
 
     Cropper.prototype.zoomToFit = function(face, frame) {
       var canvas, cropCoords, cropData, scaleFactor;
@@ -1327,7 +1369,7 @@
       center_y = face.y + face.height / 2;
       return newCoords = {
         x: Math.round(center_x - width / 2),
-        y: Math.round(center_y + height / 1.2),
+        y: Math.round(center_y - height / 1.9 + this.spacer),
         width: Math.round(width),
         height: Math.round(height)
       };
@@ -1433,16 +1475,22 @@
     }
 
     Processor.prototype.zoomOnFace = function(face) {
-      var centerFace, crop, frames;
+      var centerFace, crop;
+      if ((face.frames == null) || face.frames.length < 7) {
+        return;
+      }
       centerFace = face.frames[6];
       crop = new Cropper({
         width: player.displayWidth,
         height: player.displayHeight
       });
-      frames = this.frames.map(function(frame) {
-        return crop.zoomToFit(centerFace, frame);
-      });
-      return this.addSequence(frames);
+      crop.queue(centerFace, this.frames);
+      return crop.start((function(_this) {
+        return function(frames) {
+          console.log('done');
+          return _this.addSequence(frames, true);
+        };
+      })(this));
     };
 
     Processor.prototype.blackandwhite = function(options) {
@@ -1493,14 +1541,19 @@
     Processor.prototype.sendFrame = function(index, scale) {
       var frame, params;
       frame = this.frames[index];
-      params = {
-        frames: [frame],
-        frameNumber: index,
-        faces: this.newFaces[index],
-        scale: scale || 3,
-        spacer: Math.round(window.spacer)
-      };
-      return this.worker.postMessage(params);
+      if (frame == null) {
+        debugger;
+      }
+      if (frame != null) {
+        params = {
+          frames: [frame],
+          frameNumber: index,
+          faces: this.newFaces[index],
+          scale: scale || 3,
+          spacer: Math.round(window.spacer)
+        };
+        return this.worker.postMessage(params);
+      }
     };
 
     Processor.prototype.saturate = function(percent) {
@@ -1553,15 +1606,17 @@
       return _results;
     };
 
-    Processor.prototype.addSequence = function(frames) {
+    Processor.prototype.addSequence = function(frames, addSpacer) {
       var sequence;
       frames = frames || this.playFrames;
+      addSpacer = addSpacer || false;
       sequence = new Sequence({
         type: 'sequence',
         aspect: 16 / 9,
         duration: 3,
         src: 'CanvasPlayer',
-        frames: frames
+        frames: frames,
+        addSpacer: addSpacer
       });
       sequence.ended = function() {
         if (this.callback != null) {

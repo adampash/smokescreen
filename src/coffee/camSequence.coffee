@@ -1,5 +1,5 @@
 $ ->
-  duration = 1
+  duration = 4
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'

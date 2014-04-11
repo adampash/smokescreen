@@ -1,13 +1,35 @@
 class window.Cropper
   constructor: (@goalDimensions) ->
+    @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
+
     @transitionCanvas = @createCanvas @goalDimensions
     @transitionContext = @createContext @transitionCanvas
 
     @goalCanvas = @createCanvas @goalDimensions
     @goalContext = @createContext @goalCanvas
 
+
+  queue: (face, frames) ->
+    @frameQueue = frames
+    @currentFace = face
+    @finishedFrames = []
+
+  start: (callback) ->
+    console.log 'running cropper'
+    @doneCallback = callback || @doneCallback
+    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift()
+    if @frameQueue.length > 0
+      setTimeout =>
+        @start()
+      , 10
+    else
+      @doneCallback @finishedFrames
+
+
+
   zoomToFit: (face, frame) ->
     cropCoords = @convertFaceCoords face
+    # above needs to account for aspect adjustment on zoom
     @transitionContext.putImageData frame, 0, 0
     cropData = @transitionContext.getImageData cropCoords.x,
                                    cropCoords.y,
@@ -34,7 +56,7 @@ class window.Cropper
     # console.log 'center_x', center_x
     newCoords =
       x: Math.round center_x - width/2
-      y: Math.round center_y + height/1.2
+      y: Math.round (center_y - height/1.9 + @spacer)
       width: Math.round width
       height: Math.round height
 

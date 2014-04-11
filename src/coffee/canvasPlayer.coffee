@@ -1,6 +1,7 @@
 class window.CanvasPlayer
-  constructor: (@canvas, @frames, @fps) ->
-    @options = {}
+  constructor: (@canvas, @frames, @fps, @options) ->
+    @options = @options || {}
+    @addSpacer = @options.addSpacer
     @paused = false
     @context = @canvas.getContext('2d')
     @index = 0
@@ -58,7 +59,11 @@ class window.CanvasPlayer
     @index = index || @index
     frame = @frames[@index]
 
-    @context.putImageData(frame, 0, 0)
+    if @addSpacer
+      spacer = Math.round((@canvas.height - frame.width * 9/16) / 2)
+      @context.putImageData(frame, 0, spacer)
+    else
+      @context.putImageData(frame, 0, 0)
     @options.progress() if @options.progress
 
   cleanup: ->

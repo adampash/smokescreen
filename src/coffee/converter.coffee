@@ -48,7 +48,7 @@ class window.Converter
       log 'start processing images now'
       @foundFaces.push e.data
       if @foundFaces.length == framesToProcess.length
-        window.matchedFaces = new Faces(@foundFaces)
+        window.matchedFaces = new Faces(@foundFaces, (player.displayWidth/960))
         bestBets = matchedFaces.groupFaces()
         if bestBets[0]? and bestBets[0].isBegun()
           for face in bestBets

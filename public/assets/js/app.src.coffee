@@ -112,7 +112,8 @@ $ ->
         else if @src is 'CanvasPlayer'
           @video = new CanvasPlayer @canvas,
             @options.frames || window.recorder.capturedFrames,
-            @options.fps || window.recorder.fps
+            @options.fps || window.recorder.fps,
+            addSpacer: @options.addSpacer || false
           @video.play(
             player: @player
             ended: =>
@@ -287,8 +288,8 @@ class window.Faces
     @facesByFrames = faces
 
   groupFaces: (frames, faces) ->
-    # if !frames?
-    #   @removeAnomolies()
+    if !frames?
+      @removeAnomolies()
     frames = frames || @reconstruct()
     faces = faces || []
     frameNumber = frameNumber || 0
@@ -317,7 +318,7 @@ class window.Faces
     if @empty(frames)
       faces = @verifyFrameNumbers(faces, frames.length)
       faces = @removeProbableFalse(faces)
-      # faces = @applyScale(faces)
+      faces = @applyScale(faces)
       @faceMap = faces
       faces
     else
@@ -325,16 +326,14 @@ class window.Faces
 
   applyScale: (faces) ->
     for face in faces
-      for frame in face
-        for key of frame
-          frame[key] = Math.round(frame[key] * @scale)
+      face.applyScale(@scale)
     faces
 
   removeProbableFalse: (faces) ->
     newFaces = []
     for face in faces
       console.log face.probability()
-      if face.probability() > 0.2
+      if face.probability() > 0.18
         newFaces.push face
       else
         console.log 'removing ', face
@@ -375,7 +374,7 @@ class window.Faces
     for face, index in @allFaces
       if !face.frame
         # face size is within x% of avg face size
-        if Math.abs(1 - face.width*face.height / @avgFace) < 0.6
+        if Math.abs(1 - face.width*face.height / @avgFace) < 0.7
           goodFaces.push face
           newNumFaces++
       else
@@ -424,6 +423,13 @@ class window.Face
   constructor: () ->
     @frames = []
     @started = null
+
+
+  applyScale: (scale) ->
+    for frame in @frames
+      for key of frame
+        frame[key] = Math.round(frame[key] * scale)
+    @
 
   probability: ->
     1 - @emptyFrames() / @frames.length
@@ -585,7 +591,7 @@ class window.Face
       return false
 
 $ ->
-  duration = 1
+  duration = 4
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -638,8 +644,9 @@ $ ->
     # processor.blur()
 
 class window.CanvasPlayer
-  constructor: (@canvas, @frames, @fps) ->
-    @options = {}
+  constructor: (@canvas, @frames, @fps, @options) ->
+    @options = @options || {}
+    @addSpacer = @options.addSpacer
     @paused = false
     @context = @canvas.getContext('2d')
     @index = 0
@@ -697,7 +704,11 @@ class window.CanvasPlayer
     @index = index || @index
     frame = @frames[@index]
 
-    @context.putImageData(frame, 0, 0)
+    if @addSpacer
+      spacer = Math.round((@canvas.height - frame.width * 9/16) / 2)
+      @context.putImageData(frame, 0, spacer)
+    else
+      @context.putImageData(frame, 0, 0)
     @options.progress() if @options.progress
 
   cleanup: ->
@@ -755,7 +766,7 @@ class window.Converter
       log 'start processing images now'
       @foundFaces.push e.data
       if @foundFaces.length == framesToProcess.length
-        window.matchedFaces = new Faces(@foundFaces)
+        window.matchedFaces = new Faces(@foundFaces, (player.displayWidth/960))
         bestBets = matchedFaces.groupFaces()
         if bestBets[0]? and bestBets[0].isBegun()
           for face in bestBets
@@ -1010,14 +1021,36 @@ class window.Converter
 
 class window.Cropper
   constructor: (@goalDimensions) ->
+    @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
+
     @transitionCanvas = @createCanvas @goalDimensions
     @transitionContext = @createContext @transitionCanvas
 
     @goalCanvas = @createCanvas @goalDimensions
     @goalContext = @createContext @goalCanvas
 
+
+  queue: (face, frames) ->
+    @frameQueue = frames
+    @currentFace = face
+    @finishedFrames = []
+
+  start: (callback) ->
+    console.log 'running cropper'
+    @doneCallback = callback || @doneCallback
+    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift()
+    if @frameQueue.length > 0
+      setTimeout =>
+        @start()
+      , 10
+    else
+      @doneCallback @finishedFrames
+
+
+
   zoomToFit: (face, frame) ->
     cropCoords = @convertFaceCoords face
+    # above needs to account for aspect adjustment on zoom
     @transitionContext.putImageData frame, 0, 0
     cropData = @transitionContext.getImageData cropCoords.x,
                                    cropCoords.y,
@@ -1044,7 +1077,7 @@ class window.Cropper
     # console.log 'center_x', center_x
     newCoords =
       x: Math.round center_x - width/2
-      y: Math.round center_y + height/1.2
+      y: Math.round (center_y - height/1.9 + @spacer)
       width: Math.round width
       height: Math.round height
 
@@ -1134,14 +1167,18 @@ class window.Processor
     @playFrames = []
 
   zoomOnFace: (face) ->
+    return if !face.frames? or face.frames.length < 7
     centerFace = face.frames[6]
     # TODO face.averageFace
     crop = new Cropper
       width: player.displayWidth
       height: player.displayHeight
-    frames = @frames.map (frame) ->
-      crop.zoomToFit(centerFace, frame)
-    @addSequence frames
+    # frames = @frames.map (frame) ->
+      # crop.zoomToFit(centerFace, frame)
+    crop.queue(centerFace, @frames)
+    crop.start (frames) =>
+      console.log 'done'
+      @addSequence frames, true
 
   blackandwhite: (options) ->
     options = options || {}
@@ -1187,14 +1224,17 @@ class window.Processor
     @sendFrame 0, scale
 
   sendFrame: (index, scale) ->
+    #TODO Debug when frame is undefined here...
     frame = @frames[index]
-    params =
-      frames: [frame]
-      frameNumber: index
-      faces: @newFaces[index]
-      scale: scale || 3
-      spacer: Math.round(window.spacer)
-    @worker.postMessage params
+    debugger unless frame?
+    if frame?
+      params =
+        frames: [frame]
+        frameNumber: index
+        faces: @newFaces[index]
+        scale: scale || 3
+        spacer: Math.round(window.spacer)
+      @worker.postMessage params
 
   saturate: (percent) ->
     newFrames = []
@@ -1232,14 +1272,16 @@ class window.Processor
     for frame in @frames
       worker.postMessage [frame]
 
-  addSequence: (frames) ->
+  addSequence: (frames, addSpacer) ->
     frames = frames || @playFrames
+    addSpacer = addSpacer || false
     sequence = new Sequence
         type: 'sequence'
         aspect: 16/9
         duration: 3
         src: 'CanvasPlayer'
         frames: frames
+        addSpacer: addSpacer
     sequence.ended = ->
       @callback() if @callback?
       @cleanup()
