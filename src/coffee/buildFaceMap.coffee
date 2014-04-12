@@ -181,7 +181,8 @@ class window.Face
         @fillIn(index)
 
         i++
-    console.log 'we have ' + i + ' frames that need filling in'
+    console.log 'we had ' + i + ' frames that needed filling in'
+    @fillInEyesAndMouth()
 
   fillIn: (index) ->
     if index is 0
@@ -285,6 +286,19 @@ class window.Face
 
     face
 
+  fillInEyesAndMouth: ->
+    for frame in @frames
+      frame.eyebar =
+        x: Math.round(frame.x + frame.width/10)
+        width: Math.round(frame.width/10 * 8)
+        y: Math.round(frame.y + frame.height / 3.7)
+        height: Math.round(frame.height / 4)
+      frame.mouth =
+        x: Math.round(frame.x + frame.width/4)
+        width: Math.round(frame.width/2)
+        y: Math.round(frame.y + (frame.height/5*2.8))
+        height: Math.round(frame.height/2)
+    @frames
 
   findClosestFaceIn: (frame) ->
     face = @getLatestFace()

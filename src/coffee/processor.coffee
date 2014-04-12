@@ -10,11 +10,10 @@ class window.Processor
     crop = new Cropper
       width: player.displayWidth
       height: player.displayHeight
-    # frames = @frames.map (frame) ->
-      # crop.zoomToFit(centerFace, frame)
-    crop.queue(centerFace, @frames)
+
+    crop.queue(centerFace, allFrames)
     crop.start (frames) =>
-      console.log 'done'
+      console.log 'done running cropper'
       @addSequence frames, true
 
   blackandwhite: (options) ->
@@ -63,7 +62,9 @@ class window.Processor
   sendFrame: (index, scale) ->
     #TODO Debug when frame is undefined here...
     frame = @frames[index]
-    debugger unless frame?
+    unless frame?
+      debugger
+      # frame = @frames[index - 1]
     if frame?
       params =
         frames: [frame]
@@ -72,6 +73,53 @@ class window.Processor
         scale: scale || 3
         spacer: Math.round(window.spacer)
       @worker.postMessage params
+    else
+      console.log 'shit wtf no frame?'
+      @sendFrame index + 1 unless index <= @frames.length
+
+  queueEyebarSequence: (faces) ->
+    # figure out why frames is empty here
+    sequence = new Sequence
+        type: 'sequence'
+        aspect: 16/9
+        duration: 3
+        src: 'CanvasPlayer'
+        frames: window.allFrames
+        faces: faces
+        name: 'Eyebar'
+    sequence.ended = ->
+      @callback() if @callback?
+      @cleanup()
+      @video.cleanup()
+    sequence.drawAnimation = (index) ->
+      for thisFace in @options.faces
+        face = thisFace.frames[index]
+
+        @context.fillStyle = 'rgba(0, 0, 0, 1.0)'
+        @context.fillOpacity = 0.1
+        @context.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+        # @context.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+        # @context.font = "bold 40px sans-serif"
+        # @context.fillText("x", face.mouth.x, face.mouth.y)
+        # @context.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+        mouthQuarterX = face.mouth.width/4
+        mouthQuarterY = face.mouth.height/4
+
+        @context.beginPath()
+        @context.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY)
+        @context.lineTo(face.mouth.x + mouthQuarterX*3, face.mouth.y+face.mouth.height)
+        @context.lineTo(face.mouth.x + face.mouth.width, face.mouth.y+mouthQuarterY*3)
+        @context.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y)
+        @context.fill()
+        @context.moveTo(face.mouth.x + mouthQuarterX*3, face.mouth.y)
+        @context.lineTo(face.mouth.x, face.mouth.y+mouthQuarterY*3)
+        @context.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
+        @context.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
+        @context.fill()
+    player.addTrack sequence
+
 
   saturate: (percent) ->
     newFrames = []

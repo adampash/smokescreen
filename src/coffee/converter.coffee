@@ -54,7 +54,8 @@ class window.Converter
           for face in bestBets
             face.fillInBlanks(3)
             processor.zoomOnFace(face)
-          processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
+          # processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
+          processor.queueEyebarSequence(matchedFaces.faceMap)
         else
           console.log 'no go'
         @options.converted() if @options.converted?

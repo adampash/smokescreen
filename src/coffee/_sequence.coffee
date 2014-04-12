@@ -62,6 +62,8 @@ $ ->
             @options.frames || window.recorder.capturedFrames,
             @options.fps || window.recorder.fps,
             addSpacer: @options.addSpacer || false
+            progress: (index) =>
+              @drawAnimation(index) if @drawAnimation?
           @video.play(
             player: @player
             ended: =>
@@ -93,7 +95,7 @@ $ ->
         log 'end sequence'
         @ended()
 
-    drawAnimation: ->
+    # drawAnimation: ->
       # to be overridden by new object
 
     cleanup: ->

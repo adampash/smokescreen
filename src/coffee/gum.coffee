@@ -16,7 +16,7 @@ successCallback = (stream) ->
     webcam.src = stream
   setTimeout ->
     $(window).trigger 'click'
-  , 500
+  , 1000
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)

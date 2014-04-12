@@ -7,10 +7,10 @@ $ ->
       # onStart: ->
       #   @recordCam(3)
 
-  playbackCamSequence.drawAnimation = (context, elapsed) ->
-    @context.clearRect(0, 0,
-                      @canvas.width,
-                      @canvas.height)
+  # playbackCamSequence.drawAnimation = (context, elapsed) ->
+  #   @context.clearRect(0, 0,
+  #                     @canvas.width,
+  #                     @canvas.height)
 
 
 

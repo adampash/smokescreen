@@ -13,3 +13,4 @@ uploader =
 
     req.open("post", "http://localhost:3000/", true)
     req.send(formdata)
+    # req.send(file)

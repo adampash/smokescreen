@@ -2,6 +2,7 @@ class window.CanvasPlayer
   constructor: (@canvas, @frames, @fps, @options) ->
     @options = @options || {}
     @addSpacer = @options.addSpacer
+    @progress = @options.progress
     @paused = false
     @context = @canvas.getContext('2d')
     @index = 0
@@ -64,7 +65,7 @@ class window.CanvasPlayer
       @context.putImageData(frame, 0, spacer)
     else
       @context.putImageData(frame, 0, 0)
-    @options.progress() if @options.progress
+    @progress(index) if @progress
 
   cleanup: ->
     setTimeout =>

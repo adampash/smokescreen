@@ -10,18 +10,17 @@ class window.Cropper
 
 
   queue: (face, frames) ->
-    @frameQueue = frames
+    @frameQueue = frames.slice(0)
     @currentFace = face
     @finishedFrames = []
 
   start: (callback) ->
-    console.log 'running cropper'
     @doneCallback = callback || @doneCallback
     @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift()
     if @frameQueue.length > 0
       setTimeout =>
         @start()
-      , 10
+      , 50
     else
       @doneCallback @finishedFrames
 
@@ -30,6 +29,7 @@ class window.Cropper
   zoomToFit: (face, frame) ->
     cropCoords = @convertFaceCoords face
     # above needs to account for aspect adjustment on zoom
+    debugger unless frame?
     @transitionContext.putImageData frame, 0, 0
     cropData = @transitionContext.getImageData cropCoords.x,
                                    cropCoords.y,

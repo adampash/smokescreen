@@ -142,7 +142,14 @@
             return this.canvases.push(this.video);
           } else if (this.src === 'CanvasPlayer') {
             this.video = new CanvasPlayer(this.canvas, this.options.frames || window.recorder.capturedFrames, this.options.fps || window.recorder.fps, {
-              addSpacer: this.options.addSpacer || false
+              addSpacer: this.options.addSpacer || false,
+              progress: (function(_this) {
+                return function(index) {
+                  if (_this.drawAnimation != null) {
+                    return _this.drawAnimation(index);
+                  }
+                };
+              })(this)
             });
             return this.video.play({
               player: this.player,
@@ -190,8 +197,6 @@
           return this.ended();
         }
       };
-
-      Sequence.prototype.drawAnimation = function() {};
 
       Sequence.prototype.cleanup = function() {
         setTimeout((function(_this) {
@@ -615,7 +620,8 @@
           i++;
         }
       }
-      return console.log('we have ' + i + ' frames that need filling in');
+      console.log('we had ' + i + ' frames that needed filling in');
+      return this.fillInEyesAndMouth();
     };
 
     Face.prototype.fillIn = function(index) {
@@ -736,6 +742,27 @@
       return face;
     };
 
+    Face.prototype.fillInEyesAndMouth = function() {
+      var frame, _i, _len, _ref;
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        frame.eyebar = {
+          x: Math.round(frame.x + frame.width / 10),
+          width: Math.round(frame.width / 10 * 8),
+          y: Math.round(frame.y + frame.height / 3.7),
+          height: Math.round(frame.height / 4)
+        };
+        frame.mouth = {
+          x: Math.round(frame.x + frame.width / 4),
+          width: Math.round(frame.width / 2),
+          y: Math.round(frame.y + (frame.height / 5 * 2.8)),
+          height: Math.round(frame.height / 2)
+        };
+      }
+      return this.frames;
+    };
+
     Face.prototype.findClosestFaceIn = function(frame) {
       var face, sorted;
       face = this.getLatestFace();
@@ -778,7 +805,7 @@
 
   $(function() {
     var duration;
-    duration = 4;
+    duration = 2;
     window.camSequence = new Sequence({
       type: 'sequence',
       src: 'webcam',
@@ -820,6 +847,7 @@
       } else {
         complete = (function(_this) {
           return function() {
+            window.allFrames = recorder.capturedFrames.slice(0);
             return _this.doProcessing(recorder.capturedFrames, recorder.fps);
           };
         })(this);
@@ -831,10 +859,9 @@
       return recorder;
     };
     return camSequence.doProcessing = function(frames, fps) {
+      frames = frames.slice(0);
       window.processor = new Processor(frames, null, fps);
-      return processor.blackandwhite({
-        overwrite: true
-      });
+      return processor.blackandwhite();
     };
   });
 
@@ -846,6 +873,7 @@
       this.options = options;
       this.options = this.options || {};
       this.addSpacer = this.options.addSpacer;
+      this.progress = this.options.progress;
       this.paused = false;
       this.context = this.canvas.getContext('2d');
       this.index = 0;
@@ -931,8 +959,8 @@
       } else {
         this.context.putImageData(frame, 0, 0);
       }
-      if (this.options.progress) {
-        return this.options.progress();
+      if (this.progress) {
+        return this.progress(index);
       }
     };
 
@@ -1027,7 +1055,7 @@
                 face.fillInBlanks(3);
                 processor.zoomOnFace(face);
               }
-              processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960);
+              processor.queueEyebarSequence(matchedFaces.faceMap);
             } else {
               console.log('no go');
             }
@@ -1324,13 +1352,12 @@
     }
 
     Cropper.prototype.queue = function(face, frames) {
-      this.frameQueue = frames;
+      this.frameQueue = frames.slice(0);
       this.currentFace = face;
       return this.finishedFrames = [];
     };
 
     Cropper.prototype.start = function(callback) {
-      console.log('running cropper');
       this.doneCallback = callback || this.doneCallback;
       this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift()));
       if (this.frameQueue.length > 0) {
@@ -1338,7 +1365,7 @@
           return function() {
             return _this.start();
           };
-        })(this), 10);
+        })(this), 50);
       } else {
         return this.doneCallback(this.finishedFrames);
       }
@@ -1347,6 +1374,9 @@
     Cropper.prototype.zoomToFit = function(face, frame) {
       var canvas, cropCoords, cropData, scaleFactor;
       cropCoords = this.convertFaceCoords(face);
+      if (frame == null) {
+        debugger;
+      }
       this.transitionContext.putImageData(frame, 0, 0);
       cropData = this.transitionContext.getImageData(cropCoords.x, cropCoords.y, cropCoords.width, cropCoords.height);
       scaleFactor = this.goalDimensions.width / cropCoords.width;
@@ -1437,7 +1467,7 @@
     }
     return setTimeout(function() {
       return $(window).trigger('click');
-    }, 500);
+    }, 1000);
   };
 
   errorCallback = function(error) {
@@ -1453,9 +1483,6 @@
       duration: 3,
       src: 'CanvasPlayer'
     });
-    playbackCamSequence.drawAnimation = function(context, elapsed) {
-      return this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    };
     return playbackCamSequence.ended = function() {
       if (this.callback != null) {
         this.callback();
@@ -1484,10 +1511,10 @@
         width: player.displayWidth,
         height: player.displayHeight
       });
-      crop.queue(centerFace, this.frames);
+      crop.queue(centerFace, allFrames);
       return crop.start((function(_this) {
         return function(frames) {
-          console.log('done');
+          console.log('done running cropper');
           return _this.addSequence(frames, true);
         };
       })(this));
@@ -1553,7 +1580,59 @@
           spacer: Math.round(window.spacer)
         };
         return this.worker.postMessage(params);
+      } else {
+        console.log('shit wtf no frame?');
+        if (!(index <= this.frames.length)) {
+          return this.sendFrame(index + 1);
+        }
       }
+    };
+
+    Processor.prototype.queueEyebarSequence = function(faces) {
+      var sequence;
+      sequence = new Sequence({
+        type: 'sequence',
+        aspect: 16 / 9,
+        duration: 3,
+        src: 'CanvasPlayer',
+        frames: window.allFrames,
+        faces: faces,
+        name: 'Eyebar'
+      });
+      sequence.ended = function() {
+        if (this.callback != null) {
+          this.callback();
+        }
+        this.cleanup();
+        return this.video.cleanup();
+      };
+      sequence.drawAnimation = function(index) {
+        var face, mouthQuarterX, mouthQuarterY, thisFace, _i, _len, _ref, _results;
+        _ref = this.options.faces;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          thisFace = _ref[_i];
+          face = thisFace.frames[index];
+          this.context.fillStyle = 'rgba(0, 0, 0, 1.0)';
+          this.context.fillOpacity = 0.1;
+          this.context.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height);
+          mouthQuarterX = face.mouth.width / 4;
+          mouthQuarterY = face.mouth.height / 4;
+          this.context.beginPath();
+          this.context.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY);
+          this.context.lineTo(face.mouth.x + mouthQuarterX * 3, face.mouth.y + face.mouth.height);
+          this.context.lineTo(face.mouth.x + face.mouth.width, face.mouth.y + mouthQuarterY * 3);
+          this.context.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y);
+          this.context.fill();
+          this.context.moveTo(face.mouth.x + mouthQuarterX * 3, face.mouth.y);
+          this.context.lineTo(face.mouth.x, face.mouth.y + mouthQuarterY * 3);
+          this.context.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y + face.mouth.height);
+          this.context.lineTo(face.mouth.x + face.mouth.width, face.mouth.y + mouthQuarterY);
+          _results.push(this.context.fill());
+        }
+        return _results;
+      };
+      return player.addTrack(sequence);
     };
 
     Processor.prototype.saturate = function(percent) {

@@ -114,6 +114,8 @@ $ ->
             @options.frames || window.recorder.capturedFrames,
             @options.fps || window.recorder.fps,
             addSpacer: @options.addSpacer || false
+            progress: (index) =>
+              @drawAnimation(index) if @drawAnimation?
           @video.play(
             player: @player
             ended: =>
@@ -145,7 +147,7 @@ $ ->
         log 'end sequence'
         @ended()
 
-    drawAnimation: ->
+    # drawAnimation: ->
       # to be overridden by new object
 
     cleanup: ->
@@ -460,7 +462,8 @@ class window.Face
         @fillIn(index)
 
         i++
-    console.log 'we have ' + i + ' frames that need filling in'
+    console.log 'we had ' + i + ' frames that needed filling in'
+    @fillInEyesAndMouth()
 
   fillIn: (index) ->
     if index is 0
@@ -564,6 +567,19 @@ class window.Face
 
     face
 
+  fillInEyesAndMouth: ->
+    for frame in @frames
+      frame.eyebar =
+        x: Math.round(frame.x + frame.width/10)
+        width: Math.round(frame.width/10 * 8)
+        y: Math.round(frame.y + frame.height / 3.7)
+        height: Math.round(frame.height / 4)
+      frame.mouth =
+        x: Math.round(frame.x + frame.width/4)
+        width: Math.round(frame.width/2)
+        y: Math.round(frame.y + (frame.height/5*2.8))
+        height: Math.round(frame.height/2)
+    @frames
 
   findClosestFaceIn: (frame) ->
     face = @getLatestFace()
@@ -591,7 +607,7 @@ class window.Face
       return false
 
 $ ->
-  duration = 4
+  duration = 2
   window.camSequence = new Sequence
       type: 'sequence'
       src: 'webcam'
@@ -628,6 +644,7 @@ $ ->
         converter.runWorker()
     else
       complete = =>
+        window.allFrames = recorder.capturedFrames.slice(0)
         @doProcessing(recorder.capturedFrames, recorder.fps)
 
 
@@ -638,15 +655,15 @@ $ ->
     recorder
 
   camSequence.doProcessing = (frames, fps) ->
+    frames = frames.slice(0)
     window.processor = new Processor frames, null, fps
-    processor.blackandwhite(overwrite: true)
-    # processor.saturate()
-    # processor.blur()
+    processor.blackandwhite()
 
 class window.CanvasPlayer
   constructor: (@canvas, @frames, @fps, @options) ->
     @options = @options || {}
     @addSpacer = @options.addSpacer
+    @progress = @options.progress
     @paused = false
     @context = @canvas.getContext('2d')
     @index = 0
@@ -709,7 +726,7 @@ class window.CanvasPlayer
       @context.putImageData(frame, 0, spacer)
     else
       @context.putImageData(frame, 0, 0)
-    @options.progress() if @options.progress
+    @progress(index) if @progress
 
   cleanup: ->
     setTimeout =>
@@ -772,7 +789,8 @@ class window.Converter
           for face in bestBets
             face.fillInBlanks(3)
             processor.zoomOnFace(face)
-          processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
+          # processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
+          processor.queueEyebarSequence(matchedFaces.faceMap)
         else
           console.log 'no go'
         @options.converted() if @options.converted?
@@ -1031,18 +1049,17 @@ class window.Cropper
 
 
   queue: (face, frames) ->
-    @frameQueue = frames
+    @frameQueue = frames.slice(0)
     @currentFace = face
     @finishedFrames = []
 
   start: (callback) ->
-    console.log 'running cropper'
     @doneCallback = callback || @doneCallback
     @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift()
     if @frameQueue.length > 0
       setTimeout =>
         @start()
-      , 10
+      , 50
     else
       @doneCallback @finishedFrames
 
@@ -1051,6 +1068,7 @@ class window.Cropper
   zoomToFit: (face, frame) ->
     cropCoords = @convertFaceCoords face
     # above needs to account for aspect adjustment on zoom
+    debugger unless frame?
     @transitionContext.putImageData frame, 0, 0
     cropData = @transitionContext.getImageData cropCoords.x,
                                    cropCoords.y,
@@ -1131,7 +1149,7 @@ successCallback = (stream) ->
     webcam.src = stream
   setTimeout ->
     $(window).trigger 'click'
-  , 500
+  , 1000
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)
@@ -1147,10 +1165,10 @@ $ ->
       # onStart: ->
       #   @recordCam(3)
 
-  playbackCamSequence.drawAnimation = (context, elapsed) ->
-    @context.clearRect(0, 0,
-                      @canvas.width,
-                      @canvas.height)
+  # playbackCamSequence.drawAnimation = (context, elapsed) ->
+  #   @context.clearRect(0, 0,
+  #                     @canvas.width,
+  #                     @canvas.height)
 
 
 
@@ -1173,11 +1191,10 @@ class window.Processor
     crop = new Cropper
       width: player.displayWidth
       height: player.displayHeight
-    # frames = @frames.map (frame) ->
-      # crop.zoomToFit(centerFace, frame)
-    crop.queue(centerFace, @frames)
+
+    crop.queue(centerFace, allFrames)
     crop.start (frames) =>
-      console.log 'done'
+      console.log 'done running cropper'
       @addSequence frames, true
 
   blackandwhite: (options) ->
@@ -1226,7 +1243,9 @@ class window.Processor
   sendFrame: (index, scale) ->
     #TODO Debug when frame is undefined here...
     frame = @frames[index]
-    debugger unless frame?
+    unless frame?
+      debugger
+      # frame = @frames[index - 1]
     if frame?
       params =
         frames: [frame]
@@ -1235,6 +1254,53 @@ class window.Processor
         scale: scale || 3
         spacer: Math.round(window.spacer)
       @worker.postMessage params
+    else
+      console.log 'shit wtf no frame?'
+      @sendFrame index + 1 unless index <= @frames.length
+
+  queueEyebarSequence: (faces) ->
+    # figure out why frames is empty here
+    sequence = new Sequence
+        type: 'sequence'
+        aspect: 16/9
+        duration: 3
+        src: 'CanvasPlayer'
+        frames: window.allFrames
+        faces: faces
+        name: 'Eyebar'
+    sequence.ended = ->
+      @callback() if @callback?
+      @cleanup()
+      @video.cleanup()
+    sequence.drawAnimation = (index) ->
+      for thisFace in @options.faces
+        face = thisFace.frames[index]
+
+        @context.fillStyle = 'rgba(0, 0, 0, 1.0)'
+        @context.fillOpacity = 0.1
+        @context.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+        # @context.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+        # @context.font = "bold 40px sans-serif"
+        # @context.fillText("x", face.mouth.x, face.mouth.y)
+        # @context.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+        mouthQuarterX = face.mouth.width/4
+        mouthQuarterY = face.mouth.height/4
+
+        @context.beginPath()
+        @context.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY)
+        @context.lineTo(face.mouth.x + mouthQuarterX*3, face.mouth.y+face.mouth.height)
+        @context.lineTo(face.mouth.x + face.mouth.width, face.mouth.y+mouthQuarterY*3)
+        @context.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y)
+        @context.fill()
+        @context.moveTo(face.mouth.x + mouthQuarterX*3, face.mouth.y)
+        @context.lineTo(face.mouth.x, face.mouth.y+mouthQuarterY*3)
+        @context.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
+        @context.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
+        @context.fill()
+    player.addTrack sequence
+
 
   saturate: (percent) ->
     newFrames = []
