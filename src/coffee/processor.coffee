@@ -87,6 +87,7 @@ class window.Processor
         frames: window.allFrames
         faces: faces
         name: 'Eyebar'
+        # addSpacer: false
     sequence.ended = ->
       @callback() if @callback?
       @cleanup()

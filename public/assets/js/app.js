@@ -361,6 +361,65 @@
     })();
   });
 
+  window.soundAnalyzer = (function() {
+    function soundAnalyzer() {
+      this.analyze = __bind(this.analyze, this);
+      this.low = 1000;
+      this.high = 4000;
+    }
+
+    soundAnalyzer.prototype.playSound = function(soundURL) {
+      var $intensity, audioContext;
+      this.shouldAnalyze = true;
+      soundURL = soundURL || "/assets/audio/awobmolg.m4a";
+      console.log('playing sound: ' + soundURL);
+      $('body').append('<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>');
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.audioElement = document.getElementById("poem");
+      this.analyzer = audioContext.createAnalyser();
+      this.analyzer.fftSize = 64;
+      this.frequencyData = new Uint8Array(this.analyzer.frequencyBinCount);
+      this.audioElement.addEventListener("canplay", (function(_this) {
+        return function() {
+          var source;
+          source = audioContext.createMediaElementSource(_this.audioElement);
+          console.log('can play');
+          source.connect(_this.analyzer);
+          return _this.analyzer.connect(audioContext.destination);
+        };
+      })(this));
+      this.audioElement.addEventListener('ended', (function(_this) {
+        return function() {
+          _this.shouldAnalyze = false;
+          return console.log('ended');
+        };
+      })(this), false);
+      this.audioElement.addEventListener('playing', this.analyze, false);
+      return $intensity = $("#intensity");
+    };
+
+    soundAnalyzer.prototype.analyze = function() {
+      var frequency, magnitude, _i, _len, _ref;
+      this.analyzer.getByteFrequencyData(this.frequencyData);
+      magnitude = 0;
+      _ref = this.frequencyData;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frequency = _ref[_i];
+        magnitude += frequency;
+      }
+      this.high = Math.max(this.high, magnitude);
+      this.low = Math.min(this.low, magnitude);
+      window.audioIntensity = magnitude / this.high;
+      console.log(audioIntensity);
+      if (this.shouldAnalyze) {
+        return setTimeout(this.analyze, 33);
+      }
+    };
+
+    return soundAnalyzer;
+
+  })();
+
   window.Faces = (function() {
     function Faces(faces, scale) {
       this.scale = scale;
@@ -1770,12 +1829,8 @@
         aspect: 16 / 9
       }), playbackCamSequence
     ]);
-    $(window).resize(function() {
+    return $(window).resize(function() {
       return player.setDimensions();
-    });
-    return $(window).on('click', function() {
-      $('h1').remove();
-      return player.play();
     });
   });
 

@@ -18,6 +18,6 @@ $ ->
     player.setDimensions()
     # player.tracks[player.currentTrack].setDimensions()
 
-  $(window).on 'click', ->
-    $('h1').remove()
-    player.play()
+  # $(window).on 'click', ->
+  #   $('h1').remove()
+  #   player.play()
