@@ -1418,7 +1418,7 @@
 
     Cropper.prototype.start = function(callback) {
       this.doneCallback = callback || this.doneCallback;
-      this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift()));
+      this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift(), true));
       if (this.frameQueue.length > 0) {
         return setTimeout((function(_this) {
           return function() {
@@ -1430,7 +1430,7 @@
       }
     };
 
-    Cropper.prototype.zoomToFit = function(face, frame) {
+    Cropper.prototype.zoomToFit = function(face, frame, transparent) {
       var canvas, cropCoords, cropData, scaleFactor;
       cropCoords = this.convertFaceCoords(face);
       if (frame == null) {
@@ -1447,7 +1447,45 @@
       this.goalContext.scale(scaleFactor, scaleFactor);
       this.goalContext.drawImage(canvas, 0, 0);
       this.goalContext.scale(1 / scaleFactor, 1 / scaleFactor);
-      return this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
+      frame = this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
+      if (transparent) {
+        frame = this.makeTransparent(frame);
+      }
+      return frame;
+    };
+
+    Cropper.prototype.makeTransparent = function(frame) {
+      var center, diagonal, distance, frameWidth, idata, index, pixel, pixelNum, targetWidth, thisPixel, y, _i, _len;
+      targetWidth = 175;
+      frameWidth = frame.width;
+      idata = frame.data;
+      center = {
+        x: frame.width / 2,
+        y: frame.height / 2.7
+      };
+      diagonal = Math.sqrt(Math.pow(center.x, 2) + Math.pow(center.y, 2));
+      for (index = _i = 0, _len = idata.length; _i < _len; index = _i += 4) {
+        pixel = idata[index];
+        pixelNum = index / 4;
+        y = Math.floor(pixelNum / frameWidth);
+        thisPixel = {
+          y: y,
+          x: pixelNum - y * frameWidth
+        };
+        distance = this.distance(thisPixel, center);
+        if (distance > targetWidth) {
+          idata[index + 3] = 0;
+        } else {
+          distance = distance * 1.3;
+          idata[index + 3] = 255 - (distance / targetWidth * 255);
+        }
+      }
+      frame.data = idata;
+      return frame;
+    };
+
+    Cropper.prototype.distance = function(obj1, obj2) {
+      return Math.sqrt(Math.pow(obj1.x - obj2.x, 2) + Math.pow(obj1.y - obj2.y, 2));
     };
 
     Cropper.prototype.convertFaceCoords = function(face) {
@@ -1829,8 +1867,12 @@
         aspect: 16 / 9
       }), playbackCamSequence
     ]);
-    return $(window).resize(function() {
+    $(window).resize(function() {
       return player.setDimensions();
+    });
+    return $(window).on('click', function() {
+      $('h1').remove();
+      return player.play();
     });
   });
 

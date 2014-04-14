@@ -1110,7 +1110,7 @@ class window.Cropper
 
   start: (callback) ->
     @doneCallback = callback || @doneCallback
-    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift()
+    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift(), true
     if @frameQueue.length > 0
       setTimeout =>
         @start()
@@ -1120,7 +1120,7 @@ class window.Cropper
 
 
 
-  zoomToFit: (face, frame) ->
+  zoomToFit: (face, frame, transparent) ->
     cropCoords = @convertFaceCoords face
     # above needs to account for aspect adjustment on zoom
     debugger unless frame?
@@ -1140,7 +1140,42 @@ class window.Cropper
     @goalContext.drawImage canvas, 0, 0
 
     @goalContext.scale 1/scaleFactor, 1/scaleFactor
-    @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+    frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+
+    frame = @makeTransparent frame if transparent
+
+    frame
+
+  makeTransparent: (frame) ->
+    targetWidth = 175
+    frameWidth = frame.width
+    idata = frame.data
+    center = 
+      x: frame.width / 2
+      y: frame.height / 2.7
+    diagonal = Math.sqrt(Math.pow(center.x, 2) + Math.pow(center.y, 2))
+    for pixel, index in idata by 4
+      pixelNum = index/4
+      y = Math.floor pixelNum / frameWidth
+      thisPixel =
+        y: y
+        x: pixelNum - y*frameWidth
+      distance = @distance(thisPixel, center)
+
+      if distance > targetWidth
+        idata[index+3] = 0
+      else
+        distance = distance * 1.3
+        idata[index+3] = 255 - (distance/targetWidth * 255)
+
+    frame.data = idata
+    frame
+
+  distance: (obj1, obj2) ->
+    Math.sqrt(Math.pow((obj1.x - obj2.x), 2) + Math.pow((obj1.y - obj2.y), 2))
+
+
+
 
   convertFaceCoords: (face) ->
     width = face.width * 4
@@ -1471,6 +1506,6 @@ $ ->
     player.setDimensions()
     # player.tracks[player.currentTrack].setDimensions()
 
-  # $(window).on 'click', ->
-  #   $('h1').remove()
-  #   player.play()
+  $(window).on 'click', ->
+    $('h1').remove()
+    player.play()
