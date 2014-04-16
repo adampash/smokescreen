@@ -1,1 +1,51 @@
-FOO
+<!DOCTYPE html>
+<html>
+<head>
+<!-- <link rel="stylesheet" href="/assets/css/style.css" /> -->
+<script src="/assets/js/jquery-2.1.0.js"></script>
+<!-- <script src="/assets/js/app.js"></script> -->
+
+</head>
+<body>
+  <canvas id="mainCanvas" class="resize" width="400" height="300"></canvas>
+  <script type="text/javascript">
+    var canvas = document.getElementById('mainCanvas');
+    canvas.width = 800;
+    canvas.height = 600;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'green';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    // ctx.moveTo(75,25);
+    // ctx.quadraticCurveTo(25,25,25,62.5);
+    // ctx.quadraticCurveTo(30,100,60,150);
+    // ctx.quadraticCurveTo(50,120,30,125);
+    // ctx.quadraticCurveTo(60,120,65,100);
+    // ctx.quadraticCurveTo(125,100,125,62.5);
+    // ctx.quadraticCurveTo(125,25,75,25);
+    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo(75,25);
+    // ctx.quadraticCurveTo(25,25,25,62.5);
+    // ctx.quadraticCurveTo(25,100,50,100);
+    // ctx.quadraticCurveTo(50,120,30,125);
+    // ctx.quadraticCurveTo(60,120,65,100);
+    // ctx.quadraticCurveTo(125,100,125,62.5);
+    // ctx.quadraticCurveTo(125,25,75,25)/ ctx.beginPath();
+    // ctx.stroke();
+    // ctx.arc(100, 77, 74, 0, Math.PI * 2, false);
+    // ctx.closePath();
+    // ctx.clip();
+
+    // ctx.globalCompositeOperation = 'destination-in';
+    // ctx.fillRect(140, 40, 150, 50);
+
+
+    // ctx.restore();
+    // ctx.save();
+
+  </script>
+</body>
+</html>

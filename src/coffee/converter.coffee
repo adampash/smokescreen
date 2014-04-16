@@ -1,17 +1,17 @@
 class window.Converter
-  constructor: (@canvas, @frames, @fps, @player, options) ->
+  constructor: (@width, options) ->
     @options = options || {}
-    @convertCanvas = document.createElement('canvas')
-    @convertCanvas.width = @canvas.width
-    @convertCanvas.height = @canvas.height
-    @convertContext = @convertCanvas.getContext('2d')
-    @files = []
-    @uploadedFiles = []
-    @formdata = new FormData()
-    @fps = @fps || 10
-    @save = false
-    @uploadedSprite
-    @gifFinished = options.gifFinished
+    # @convertCanvas = document.createElement('canvas')
+    # @convertCanvas.width = @canvas.width
+    # @convertCanvas.height = @canvas.height
+    # @convertContext = @convertCanvas.getContext('2d')
+    # @files = []
+    # @uploadedFiles = []
+    # @formdata = new FormData()
+    # @fps = @fps || 10
+    # @save = false
+    # @uploadedSprite
+    # @gifFinished = options.gifFinished
 
   reset: ->
     @files = []
@@ -37,7 +37,7 @@ class window.Converter
       log 'All done converting and uploading frames'
       alert 'DONE'
 
-  runWorker: ->
+  runWorker: (@frames, @complete) ->
     worker = new Worker('/workers/findFaces.js')
 
     framesToProcess = (frame for frame in @frames by 5)
@@ -48,17 +48,9 @@ class window.Converter
       log 'start processing images now'
       @foundFaces.push e.data
       if @foundFaces.length == framesToProcess.length
-        window.matchedFaces = new Faces(@foundFaces, (player.displayWidth/960))
+        window.matchedFaces = new Faces(@foundFaces, ($(document).width()/@width))
         bestBets = matchedFaces.groupFaces()
-        if bestBets[0]? and bestBets[0].isBegun()
-          for face in bestBets
-            face.fillInBlanks(3)
-            processor.zoomOnFace(face)
-          # processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
-          processor.queueEyebarSequence(matchedFaces.faceMap)
-        else
-          console.log 'no go'
-        @options.converted() if @options.converted?
+        @complete(bestBets, matchedFaces)
     , false)
 
     @startedAt = new Date().getTime()

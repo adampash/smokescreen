@@ -14,9 +14,20 @@ successCallback = (stream) ->
     webcam.src = window.URL.createObjectURL(stream)
   else
     webcam.src = stream
-  setTimeout ->
-    $(window).trigger 'click'
-  , 1000
+
+
+  # window.webcam = new VideoTrack
+  #   src: webcam.src
+  #   aspect: @aspect
+  #   littleCanvas: true
+  #   shouldDraw: false
+  # @video.play(@player, null,
+  #   onplaystart: =>
+  #     @onStart() if @onStart?
+  # )
+  # setTimeout ->
+  #   $(window).trigger 'click'
+  # , 1000
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)

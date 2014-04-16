@@ -1,7 +1,7 @@
 $ ->
   window.dev = true
   window.log = (args) ->
-    if false
+    if true
       console.log.apply console,  arguments
 
   if dev
@@ -281,6 +281,8 @@ $ ->
 
 class window.soundAnalyzer
   constructor: ->
+    @all = 0
+    @counter = 0
     @low = 1000
     @high = 4000
   playSound: (soundURL) ->
@@ -307,7 +309,8 @@ class window.soundAnalyzer
 
     @audioElement.addEventListener('ended', =>
       @shouldAnalyze = false
-      console.log('ended')
+      log 'average level: ' + @all/@counter
+      log('audio ended')
     , false)
     # audioElement.addEventListener('canplaythrough', voiceLoaded, false)
     @audioElement.addEventListener('playing', @analyze, false)
@@ -326,13 +329,17 @@ class window.soundAnalyzer
 
     @high = Math.max @high, magnitude
     @low = Math.min @low, magnitude
+    @all += magnitude
+    @counter++
 
     window.audioIntensity = (magnitude/@high)
-    console.log audioIntensity
+    # console.log audioIntensity
     # opacity = 0.8 - (magnitude/frequencyData.length)/40
     # $intensity.css("opacity": opacity)
 
     setTimeout(@analyze, 33) if @shouldAnalyze
+
+  
 
 class window.Faces
   constructor: (faces, @scale) ->
@@ -375,16 +382,16 @@ class window.Faces
     if @empty(frames)
       faces = @verifyFrameNumbers(faces, frames.length)
       faces = @removeProbableFalse(faces)
-      faces = @applyScale(faces)
+      # faces = @applyScale(@scale)
       @faceMap = faces
       faces
     else
       @groupFaces(frames, faces)
 
-  applyScale: (faces) ->
-    for face in faces
-      face.applyScale(@scale)
-    faces
+  applyScale: (scale) ->
+    for face in @faceMap
+      face.applyScale(scale)
+    @faceMap
 
   removeProbableFalse: (faces) ->
     newFaces = []
@@ -417,6 +424,7 @@ class window.Faces
     empty
 
   prepareForCanvas: (faces) ->
+    faces = faces or @faceMap
     frames = []
     for face in faces
       for frame, index in face.frames
@@ -424,6 +432,10 @@ class window.Faces
         frames[index].push frame if frame?
     frames
 
+  fillInBlanks: ->
+    for face in @faceMap
+      face.fillInBlanks(3)
+    @faceMap
 
   removeAnomolies: ->
     goodFaces = []
@@ -634,6 +646,9 @@ class window.Face
         width: Math.round(frame.width/2)
         y: Math.round(frame.y + (frame.height/5*2.8))
         height: Math.round(frame.height/2)
+      frame.mouth.center =
+        x: Math.round frame.mouth.x + frame.mouth.width/2
+        y: Math.round frame.mouth.y + frame.mouth.height/2
     @frames
 
   findClosestFaceIn: (frame) ->
@@ -645,6 +660,46 @@ class window.Face
 
   distance: (obj1, obj2) ->
     Math.sqrt(Math.pow((obj1.x - obj2.x), 2) + Math.pow((obj1.y - obj2.y), 2))
+
+  pulse: (ctx, index, amount) ->
+    mouth = @frames[index].mouth
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
+    ctx.beginPath()
+    pulseAmount = mouth.width/3 * amount * 1.8
+    ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
+
+    alpha = ((255 - audioIntensity * 255) + 100) / 200
+    log alpha
+
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = 'black'
+    ctx.fill()
+    ctx.globalCompositeOperation = 'source-over'
+
+  drawFace: (ctx, index) ->
+    face = @frames[index]
+
+    ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
+    ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+    mouthQuarterX = face.mouth.width/4
+    mouthQuarterY = face.mouth.height/4
+
+    ctx.beginPath()
+    ctx.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY)
+    ctx.lineTo(face.mouth.x + mouthQuarterX*3, face.mouth.y+face.mouth.height)
+    ctx.lineTo(face.mouth.x + face.mouth.width, face.mouth.y+mouthQuarterY*3)
+    ctx.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y)
+    ctx.fill()
+    ctx.moveTo(face.mouth.x + mouthQuarterX*3, face.mouth.y)
+    ctx.lineTo(face.mouth.x, face.mouth.y+mouthQuarterY*3)
+    ctx.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
+    ctx.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
+    ctx.fill()
 
 
   isBegun: ->
@@ -715,10 +770,10 @@ $ ->
     processor.blackandwhite()
 
 class window.CanvasPlayer
-  constructor: (@canvas, @frames, @fps, @options) ->
-    @options = @options || {}
-    @addSpacer = @options.addSpacer
-    @progress = @options.progress
+  constructor: (@canvas, @frames, @fps) ->
+    # @options = @options || {}
+    # @addSpacer = @options.addSpacer
+    # @progress = @options.progress
     @paused = false
     @context = @canvas.getContext('2d')
     @index = 0
@@ -745,24 +800,26 @@ class window.CanvasPlayer
       @canvas.height = @player.displayHeight
 
   play: (options) ->
-    @player = options.player if options.player?
+    if options.onstart?
+      options.onstart()
+      log 'start'
+      options.onstart = null
     @timeout = 1/@fps * 1000
-    unless @paused
-      @options = options || @options
-      if @endFrame > @index
-        if @index <= @startFrame
-          @index = @startFrame
-          @increment = true
-        if @increment then @index++ else @index--
-      else
-        unless @loop
-          return @options.ended() if @options.ended
-        if @loopStyle == 'beginning'
-          @index = @startFrame
-        else
-          @index = @endFrame - 1
-          @increment = false
-      @paintFrame(@index)
+    @options = options || @options
+    if @endFrame > @index
+      @index++
+    else
+        return @options.complete()
+
+    frame = @frames[@index]
+    frame = @options.preprocess(frame) if @options.preprocess?
+    @paintFrame(frame, @index)
+    @options.addition(@context, @index) if @options.addition?
+    # if @options.postprocess?
+    #   log 'post process'
+    #   frame = @context.getImageData 0, 0, @canvas.width, @canvas.height
+    #   frame = @options.postprocess(frame)
+    #   @paintFrame(frame, @index)
 
     setTimeout =>
       @play(options)
@@ -771,17 +828,9 @@ class window.CanvasPlayer
   pause: ->
     @paused = !@paused
 
-  paintFrame: (index) ->
-    return false if index >= @frames.length || index < 0
-    @index = index || @index
-    frame = @frames[@index]
-
-    if @addSpacer
-      spacer = Math.round((@canvas.height - frame.width * 9/16) / 2)
-      @context.putImageData(frame, 0, spacer)
-    else
-      @context.putImageData(frame, 0, 0)
-    @progress(index) if @progress
+  paintFrame: (frame, index) ->
+    @context.putImageData(frame, 0, 0)
+    # @progress(index) if @progress
 
   cleanup: ->
     setTimeout =>
@@ -789,19 +838,19 @@ class window.CanvasPlayer
     , 300
 
 class window.Converter
-  constructor: (@canvas, @frames, @fps, @player, options) ->
+  constructor: (@width, options) ->
     @options = options || {}
-    @convertCanvas = document.createElement('canvas')
-    @convertCanvas.width = @canvas.width
-    @convertCanvas.height = @canvas.height
-    @convertContext = @convertCanvas.getContext('2d')
-    @files = []
-    @uploadedFiles = []
-    @formdata = new FormData()
-    @fps = @fps || 10
-    @save = false
-    @uploadedSprite
-    @gifFinished = options.gifFinished
+    # @convertCanvas = document.createElement('canvas')
+    # @convertCanvas.width = @canvas.width
+    # @convertCanvas.height = @canvas.height
+    # @convertContext = @convertCanvas.getContext('2d')
+    # @files = []
+    # @uploadedFiles = []
+    # @formdata = new FormData()
+    # @fps = @fps || 10
+    # @save = false
+    # @uploadedSprite
+    # @gifFinished = options.gifFinished
 
   reset: ->
     @files = []
@@ -827,7 +876,7 @@ class window.Converter
       log 'All done converting and uploading frames'
       alert 'DONE'
 
-  runWorker: ->
+  runWorker: (@frames, @complete) ->
     worker = new Worker('/workers/findFaces.js')
 
     framesToProcess = (frame for frame in @frames by 5)
@@ -838,17 +887,9 @@ class window.Converter
       log 'start processing images now'
       @foundFaces.push e.data
       if @foundFaces.length == framesToProcess.length
-        window.matchedFaces = new Faces(@foundFaces, (player.displayWidth/960))
+        window.matchedFaces = new Faces(@foundFaces, ($(document).width()/@width))
         bestBets = matchedFaces.groupFaces()
-        if bestBets[0]? and bestBets[0].isBegun()
-          for face in bestBets
-            face.fillInBlanks(3)
-            processor.zoomOnFace(face)
-          # processor.drawFaceRects(matchedFaces.prepareForCanvas(bestBets), player.displayWidth / 960)
-          processor.queueEyebarSequence(matchedFaces.faceMap)
-        else
-          console.log 'no go'
-        @options.converted() if @options.converted?
+        @complete(bestBets, matchedFaces)
     , false)
 
     @startedAt = new Date().getTime()
@@ -1094,7 +1135,7 @@ class window.Converter
 
 class window.Cropper
   constructor: (@goalDimensions) ->
-    @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
+    # @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
 
     @transitionCanvas = @createCanvas @goalDimensions
     @transitionContext = @createContext @transitionCanvas
@@ -1110,20 +1151,21 @@ class window.Cropper
 
   start: (callback) ->
     @doneCallback = callback || @doneCallback
-    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift(), true
+    @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift(), false
     if @frameQueue.length > 0
       setTimeout =>
         @start()
-      , 50
+      , 75
     else
       @doneCallback @finishedFrames
 
 
 
-  zoomToFit: (face, frame, transparent) ->
+  zoomToFit: (face, frame, isolate) ->
+    # debugger if isolate
     cropCoords = @convertFaceCoords face
     # above needs to account for aspect adjustment on zoom
-    debugger unless frame?
+    # debugger unless frame?
     @transitionContext.putImageData frame, 0, 0
     cropData = @transitionContext.getImageData cropCoords.x,
                                    cropCoords.y,
@@ -1142,17 +1184,72 @@ class window.Cropper
     @goalContext.scale 1/scaleFactor, 1/scaleFactor
     frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
 
-    frame = @makeTransparent frame if transparent
+    frame = @isolateFace(face, frame) if isolate
 
     frame
 
-  makeTransparent: (frame) ->
+  isolateFace: (face, frame) ->
+    log 'isolate face'
+    @goalContext.globalAlpha = 0.5
+    @goalContext.putImageData frame, 0, 0
+    @goalContext.globalAlpha = 1
+    # img = @goalCanvas.toDataURL()
+
+    center =
+      x: frame.width / 2
+      # y: frame.height / 2.7
+      y: frame.height / 2
+
+    face =
+      x: Math.round center.x - frame.width/8
+      y: Math.round center.y - frame.width/14
+      width: Math.round frame.width/5.5
+      height: Math.round frame.width/3.4
+    # @goalContext.globalCompositeOperation = 'destination-in'
+    # @goalContext.fillRect(face.x, face.y, face.width, face.height)
+    # @drawEllipseByCenter(@goalContext, center.x, center.y, face.width, face.height)
+
+    # @goalContext.fill()
+
+    frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+    frame = @makeTransparent frame, face.width
+    # idata = frame.data
+    # for pixel, index in idata
+    #   r = idata[index]
+    #   g = idata[index+1]
+    #   b = idata[index+2]
+
+  drawEllipseByCenter: (ctx, cx, cy, w, h) ->
+    @drawEllipse(ctx, cx - w/2.0, cy - h/2.0, w, h)
+
+  drawEllipse: (ctx, x, y, w, h) ->
+    kappa = .5522848
+    ox = (w / 2) * kappa
+    oy = (h / 2) * kappa
+    xe = x + w
+    ye = y + h
+    xm = x + w / 2
+    ym = y + h / 2
+    ctx.beginPath()
+    ctx.moveTo(x, ym)
+    ctx.bezierCurveTo(x, ym - oy, xm - ox, y, xm, y)
+    ctx.bezierCurveTo(xm + ox, y, xe, ym - oy, xe, ym)
+    ctx.bezierCurveTo(xe, ym + oy, xm + ox, ye, xm, ye)
+    ctx.bezierCurveTo(xm - ox, ye, x, ym + oy, x, ym)
+    ctx.closePath()
+    ctx.stroke()
+
+
+  makeTransparent: (frame, width) ->
     targetWidth = 175
     frameWidth = frame.width
+    frameHeight = frame.height
+    midHeight = frameHeight/2
+    midWidth = frameWidth/2
     idata = frame.data
     center = 
       x: frame.width / 2
-      y: frame.height / 2.7
+      y: frame.height / 2.2
     diagonal = Math.sqrt(Math.pow(center.x, 2) + Math.pow(center.y, 2))
     for pixel, index in idata by 4
       pixelNum = index/4
@@ -1166,6 +1263,9 @@ class window.Cropper
         idata[index+3] = 0
       else
         distance = distance * 1.3
+        if Math.abs(midHeight - y) > targetWidth
+          targetWidth += 40
+        # targetWidth = targetWidth + Math.abs(midHeight - y) / frameHeight * targetWidth
         idata[index+3] = 255 - (distance/targetWidth * 255)
 
     frame.data = idata
@@ -1185,11 +1285,10 @@ class window.Cropper
     # console.log 'center_x', center_x
     newCoords =
       x: Math.round center_x - width/2
-      y: Math.round (center_y - height/1.9 + @spacer)
+      # y: Math.round (center_y - height/1.9 + @spacer)
+      y: Math.round (center_y - height/1.9)
       width: Math.round width
       height: Math.round height
-
-
 
 
   createCanvas: (dimensions) ->
@@ -1237,14 +1336,190 @@ successCallback = (stream) ->
     webcam.src = window.URL.createObjectURL(stream)
   else
     webcam.src = stream
-  setTimeout ->
-    $(window).trigger 'click'
-  , 1000
+
+
+  # window.webcam = new VideoTrack
+  #   src: webcam.src
+  #   aspect: @aspect
+  #   littleCanvas: true
+  #   shouldDraw: false
+  # @video.play(@player, null,
+  #   onplaystart: =>
+  #     @onStart() if @onStart?
+  # )
+  # setTimeout ->
+  #   $(window).trigger 'click'
+  # , 1000
 
 errorCallback = (error) ->
   log("navigator.getUserMedia error: ", error)
 
 navigator.getUserMedia(constraints, successCallback, errorCallback)
+
+class window.PlayController
+  constructor: ->
+    @started =
+      yes: true
+    @setDimensions()
+    @recordCanvas = @createCanvas(@displayWidth)
+    @recordCtx = @createContext @recordCanvas
+
+    @smallRecord = @createCanvas(720)
+    # @smallRecord = @createCanvas(960)
+    @smallCtx = @createContext @smallRecord
+
+    # $('body').prepend @recordCanvas
+    # $('body').prepend @smallRecord
+
+
+    @recorder = new Recorder @recordCanvas
+    @smallRecorder = new Recorder @smallRecord
+
+    @video = $('#mainPlayer')[0]
+    @canvas = $('#mainCanvas')[0]
+    @canvas.width = @recordCanvas.width
+    @canvas.height = @recordCanvas.height
+    @ctx = @canvas.getContext '2d'
+
+  init: ->
+    $(window).on 'click', =>
+      $('h1').remove()
+      @video.play()
+      @webcam = $('#webcam')[0]
+      @webcam.src = webcam.src
+      @drawWebcam()
+
+    @video.addEventListener 'timeupdate', (e) =>
+      @checkTime(e)
+      # @gameTime(e)
+
+  drawWebcam: =>
+    @recordCtx.drawImage(@webcam,0,0, @recordCanvas.width, @recordCanvas.height)
+    @smallCtx.drawImage(@webcam,0,0, @smallRecord.width, @smallRecord.height)
+
+    if @recordingComplete
+      webcam.stop()
+    else
+      requestAnimationFrame =>
+        @drawWebcam()
+
+
+  checkTime: (e) ->
+    time = @video.currentTime
+    # log time
+    if Math.floor(time) is 3
+      @recordWebcam()
+    if Math.floor(time) is 21
+      @playback('raw') unless @started.raw?
+    if Math.floor(time) is 39
+      @playback('firstFace') unless @started.firstFace?
+    if Math.floor(time) is 45
+      @playback('xFrames') unless @started.xFrames?
+    # if Math.floor(time) is 49
+    #   @playback('secondFace') unless @started.secondFace?
+    if Math.floor(time) is 61
+      @playback('thirdFace') unless @started.thirdFace?
+    if Math.floor(time) is 69
+      @playback('alphaFace') unless @started.alphaFace?
+
+  gameTime: (e) ->
+    time = @video.currentTime
+    if Math.floor(time) is 127
+      @recordWebcam()
+    # if Math.floor(time) is 21
+    #   @playback('raw') unless @started.raw?
+    if Math.floor(time) is 180
+      @playback('firstFace') unless @started.firstFace?
+    if Math.floor(time) is 187
+      @playback('secondFace') unless @started.secondFace?
+    if Math.floor(time) is 194
+      @playback('thirdFace') unless @started.thirdFace?
+    # if Math.floor(time) is 67
+    #   @playback('xFrames') unless @started.xFrames?
+
+  playback: (segment) ->
+    debugger if segment is 'alphaFace'
+    log 'play ' + segment
+    @started[segment] = true
+    segment = @smoker.segments[segment]
+    log 'playing'
+    if segment?
+      window.cPlayer = new CanvasPlayer @canvas, segment.frames, 20 #@smoker.fps
+      cPlayer.play
+        preprocess: segment.preprocess
+        postprocess: segment.postprocess
+        onstart: segment.start
+        addition: segment.addition
+        complete: =>
+          @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
+          log 'done playing'
+    else
+      log 'segment was not finished'
+
+
+    # @ctx.putImageData
+    # @ctx.fillStyle = "black"
+    # @ctx.fillRect(10, 10, 300, 200)
+
+  recordWebcam: ->
+    secs = 3
+    unless @recorder.started
+      log 'start recording'
+      @smoker = new Smoker(@recordCanvas, @recordCtx)
+
+      @recorder.record secs, 30,
+        complete: =>
+          log 'done recording'
+          @smoker.setFrames @recorder.capturedFrames.slice(0), @recorder.fps
+          @startProcessing @recorder.capturedFrames.slice(0), @recorder.fps
+          @recordingComplete = true
+
+    unless @smallRecorder.started
+      @smallRecorder.record secs, 30,
+        complete: =>
+          @smoker.setSmall @smallRecorder.capturedFrames
+          @smoker.findFaces()
+          @recordingComplete = true
+          log 'now find faces'
+
+  startProcessing: (frames, fps) ->
+    frames = frames.slice(0)
+    window.processor = new Processor frames, null, fps
+    faces = processor.
+    bnwFrames = processor.blackandwhite
+      complete: (bnwFrames) =>
+        @smoker.setBNW(bnwFrames)
+
+  findFaces: ->
+    window.converter = new Converter @recorder.canvas,
+                        @recorder.capturedFrames,
+                        @recorder.fps,
+                        null,
+                        converted: ->
+    converter.runWorker()
+
+  setDimensions: (canvas) ->
+    # @video = @video || $('video')[0]
+
+    @displayWidth = $(document).width()
+    @displayHeight = $(document).height()
+
+    # videoHeight = @displayWidth * 9/16
+    # log videoHeight
+    # spacer = (@displayHeight - videoHeight) / 2
+    # log spacer
+
+    # $(@video).css('margin-top', (@displayHeight - videoHeight) / 2)
+
+  createCanvas: (width) ->
+    canvas = document.createElement 'canvas'
+    canvas.height = Math.ceil width * 9/16
+    canvas.width = width
+    canvas
+
+  createContext: (canvas) ->
+    context = canvas.getContext '2d'
+
 
 $ ->
   window.playbackCamSequence = new Sequence
@@ -1299,7 +1574,8 @@ class window.Processor
         log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
 
         @playFrames = newFrames
-        @addSequence()
+        options.complete(newFrames)
+        # @addSequence()
       else
         worker.postMessage [@frames[newFrames.length]]
     , false)
@@ -1455,12 +1731,14 @@ class window.Recorder
     @context = @canvas.getContext('2d')
     @width = @canvas.width
     @height = @canvas.height
+    @started = false
 
   reset: ->
     @capturedFrames = []
 
 
   record: (seconds, @fps, @options) ->
+    @started = true
     @options = @options || {}
     @fps = @fps || 30
     seconds = seconds || 3
@@ -1484,28 +1762,247 @@ class window.Recorder
     else
       @options.complete() if @options.complete
 
+class window.Smoker
+  constructor: (@canvas, @context) ->
+    @frames = []
+    @smallFrames = []
+    @bnwFrames = []
+    @segments = {}
+    @xFrames = []
+
+
+  setBNW: (frames) ->
+    @bnwFrames = frames.slice(0)
+    if @faces? and @xFrames.length is 0
+      @processXFrames()
+
+  setFrames: (frames, fps) ->
+    @frames = frames.slice(0)
+    @width = @frames[0].width
+    @height = @frames[0].height
+    @segments.raw =
+      frames: @frames
+    @fps = fps
+
+  setSmall: (frames) ->
+    @smallFrames = frames.slice(0)
+
+  findFaces: ->
+    window.converter = new Converter(@smallFrames[0].width)
+    converter.runWorker(@smallFrames, (faces, faceCollection) =>
+      @faces = faces
+      @faceCollection = faceCollection
+      @faceCollection.applyScale(@frames[0].width/@smallFrames[0].width)
+      @faceCollection.fillInBlanks(3)
+      log 'got all the faces', @faces
+      if @bnwFrames.length > 0 and @xFrames.length is 0
+        @processXFrames()
+      # @segments.rawRects =
+      #   frames: @frames
+      #   addition: (ctx, index) =>
+      #     @drawFaces(ctx, index)
+    )
+
+
+  processXFrames: (inProcess, index) ->
+    inProcess = inProcess or @bnwFrames.slice(0)
+    index = index or 0
+    frame = inProcess.shift()
+    @context.putImageData(frame, 0, 0)
+    @drawFaces @context, index
+    @xFrames.push @context.getImageData 0, 0, @canvas.width, @canvas.height
+
+    if inProcess.length > 0
+      setTimeout =>
+        index++
+        @processXFrames(inProcess, index)
+      , 50
+    else
+      log 'done with processXFrames'
+      @segments.xFrames =
+        frames: @xFrames
+        addition: @pulseMouths
+        # postprocess: @pulseBlack
+        preprocess: @pulseBlack
+
+      log 'set up zooms'
+      @setupZooms()
+
+
+  setupZooms: ->
+    if @faces.length > 0
+      zoomFaces = []
+      # TODO @faceCollection.threeBestFaces()
+      for i in [0..2]
+        if i < @faces.length
+          zoomFaces[i] = @faces[i]
+        else
+          zoomFaces[i] = @faces[0]
+      @zoomOnFace(zoomFaces[0], (frames) =>
+        log 'zoom ready'
+        @segments.firstFace =
+          frames: frames
+          # addition: @pulseMouths
+          # preprocess: @pulseBlack
+          addition: @fadeInOut
+          start: ->
+            new soundAnalyzer().playSound()
+        @getSecondFace(zoomFaces)
+      )
+    else
+      log 'no faces to zoom on'
+
+  zoomOnFace: (face, complete) ->
+    return if !face.frames? or face.frames.length < 7
+
+    frames = @bnwFrames.slice(0)
+
+    centerFace = face.frames[6]
+    # TODO face.averageFace
+    crop = new Cropper
+      width: @width
+      height: @height
+    crop.queue(centerFace, frames)
+    crop.start (frames) =>
+      console.log 'done running cropper'
+      complete(frames)
+
+  getSecondFace: (zoomFaces) ->
+    @zoomOnFace(zoomFaces[1], (frames) =>
+      @segments.secondFace =
+        frames: frames
+        addition: @fadeInOut
+      @getThirdFace(zoomFaces)
+    )
+
+  getThirdFace: (zoomFaces) ->
+    @zoomOnFace(zoomFaces[2], (frames) =>
+      @segments.thirdFace =
+        frames: frames
+        addition: @fadeInOut
+
+      @getAlphaFace()
+    )
+
+  getAlphaFace: ->
+    log 'get alpha face'
+    face = @faces[0].frames[8]
+    frame = @bnwFrames.slice(8, 9)[0]
+
+    crop = new Cropper
+      width: @width
+      height: @height
+
+    @alphaFace = crop.zoomToFit(face, frame, true)
+    @alphaFrames = []
+    for i in [0..30]
+      @alphaFrames.push @alphaFace
+    @segments.alphaFace =
+      frames: @alphaFrames
+      addition: @drawAlphaFace
+
+  drawFaces: (ctx, index) ->
+    if @faces.length > 0
+      for face in @faces
+        face.drawFace ctx, index
+
+  pulseBlack: (frame) =>
+    log 'pulse black'
+    idata = frame.data
+    trans = Math.floor (255 - audioIntensity * 255) + 100
+    # trans = 150 - trans
+    # trans = Math.floor trans/60 * 255
+    # log trans
+
+    for pixel, index in idata by 4
+      r = idata[index]
+      g = idata[index+1]
+      # b = idata[index+2]
+
+      # total = r + g + b
+      # debugger
+      if r is 5 and g is 0
+        # c = trans * 0.5
+        # idata[index] = c
+        # idata[index+1] = c
+        # idata[index+2] = c
+        idata[index+3] = 0
+        # debugger
+
+    frame.data = idata
+    frame
+
+  fadeInOut: (ctx, index) ->
+    # totalFrames = totalFrames or 90
+    if index < 45
+      alpha = 1 - index/45
+      ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    else if index > 45
+      alpha = index%45/45
+      ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+  pulseMouths: (ctx, index) =>
+    if @faces.length > 0
+      for face in @faces
+        face.pulse ctx, index, audioIntensity
+
+  drawAlphaFace: (ctx, index) =>
+    frame =
+      width: ctx.canvas.width
+      height: ctx.canvas.height
+
+    face =
+      eyebar:
+        x: frame.width / 3
+        y: frame.height / 3
+        width: frame.width / 3
+        height: frame.height / 12
+
+
+
+    # ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = 'black'
+
+    ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+
 
 
 $ ->
-  window.faces = []
-  window.player = new Player [
-      camSequence
-    ,
-      testSequence
-    ,
-      playbackCamSequence
-    ,
-      new VideoTrack
-        src: '/assets/videos/short.mov'
-        aspect: 16/9
-    ,
-      playbackCamSequence
-  ]
+  window.video = $('video')[0]
+  window.audioIntensity = 0.5
+  init = ->
+    window.player = new PlayController()
+    player.init()
+
+    # start drawing webcam to player's record canvases
+
+  init()
+
+
+
+
+  # window.faces = []
+  # window.player = new Player [
+  #     camSequence
+  #   ,
+  #     testSequence
+  #   ,
+  #     playbackCamSequence
+  #   ,
+  #     new VideoTrack
+  #       src: '/assets/videos/short.mov'
+  #       aspect: 16/9
+  #   ,
+  #     playbackCamSequence
+  # ]
 
   $(window).resize ->
     player.setDimensions()
-    # player.tracks[player.currentTrack].setDimensions()
+  #   # player.tracks[player.currentTrack].setDimensions()
 
-  $(window).on 'click', ->
-    $('h1').remove()
-    player.play()
+  # $(window).on 'click', ->
+  #   $('h1').remove()
+  #   video.play()
+    # player.play()

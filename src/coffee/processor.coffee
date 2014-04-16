@@ -28,7 +28,8 @@ class window.Processor
         log "Total time took: " + (new Date().getTime() - @startedAt)/1000 + 'secs'
 
         @playFrames = newFrames
-        @addSequence()
+        options.complete(newFrames)
+        # @addSequence()
       else
         worker.postMessage [@frames[newFrames.length]]
     , false)

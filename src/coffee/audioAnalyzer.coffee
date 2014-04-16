@@ -1,5 +1,7 @@
 class window.soundAnalyzer
   constructor: ->
+    @all = 0
+    @counter = 0
     @low = 1000
     @high = 4000
   playSound: (soundURL) ->
@@ -26,7 +28,8 @@ class window.soundAnalyzer
 
     @audioElement.addEventListener('ended', =>
       @shouldAnalyze = false
-      console.log('ended')
+      log 'average level: ' + @all/@counter
+      log('audio ended')
     , false)
     # audioElement.addEventListener('canplaythrough', voiceLoaded, false)
     @audioElement.addEventListener('playing', @analyze, false)
@@ -45,10 +48,14 @@ class window.soundAnalyzer
 
     @high = Math.max @high, magnitude
     @low = Math.min @low, magnitude
+    @all += magnitude
+    @counter++
 
     window.audioIntensity = (magnitude/@high)
-    console.log audioIntensity
+    # console.log audioIntensity
     # opacity = 0.8 - (magnitude/frequencyData.length)/40
     # $intensity.css("opacity": opacity)
 
     setTimeout(@analyze, 33) if @shouldAnalyze
+
+  

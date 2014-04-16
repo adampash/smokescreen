@@ -39,16 +39,16 @@ class window.Faces
     if @empty(frames)
       faces = @verifyFrameNumbers(faces, frames.length)
       faces = @removeProbableFalse(faces)
-      faces = @applyScale(faces)
+      # faces = @applyScale(@scale)
       @faceMap = faces
       faces
     else
       @groupFaces(frames, faces)
 
-  applyScale: (faces) ->
-    for face in faces
-      face.applyScale(@scale)
-    faces
+  applyScale: (scale) ->
+    for face in @faceMap
+      face.applyScale(scale)
+    @faceMap
 
   removeProbableFalse: (faces) ->
     newFaces = []
@@ -81,6 +81,7 @@ class window.Faces
     empty
 
   prepareForCanvas: (faces) ->
+    faces = faces or @faceMap
     frames = []
     for face in faces
       for frame, index in face.frames
@@ -88,6 +89,10 @@ class window.Faces
         frames[index].push frame if frame?
     frames
 
+  fillInBlanks: ->
+    for face in @faceMap
+      face.fillInBlanks(3)
+    @faceMap
 
   removeAnomolies: ->
     goodFaces = []
@@ -298,6 +303,9 @@ class window.Face
         width: Math.round(frame.width/2)
         y: Math.round(frame.y + (frame.height/5*2.8))
         height: Math.round(frame.height/2)
+      frame.mouth.center =
+        x: Math.round frame.mouth.x + frame.mouth.width/2
+        y: Math.round frame.mouth.y + frame.mouth.height/2
     @frames
 
   findClosestFaceIn: (frame) ->
@@ -309,6 +317,46 @@ class window.Face
 
   distance: (obj1, obj2) ->
     Math.sqrt(Math.pow((obj1.x - obj2.x), 2) + Math.pow((obj1.y - obj2.y), 2))
+
+  pulse: (ctx, index, amount) ->
+    mouth = @frames[index].mouth
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
+    ctx.beginPath()
+    pulseAmount = mouth.width/3 * amount * 1.8
+    ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
+
+    alpha = ((255 - audioIntensity * 255) + 100) / 200
+    log alpha
+
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = 'black'
+    ctx.fill()
+    ctx.globalCompositeOperation = 'source-over'
+
+  drawFace: (ctx, index) ->
+    face = @frames[index]
+
+    ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
+    ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
+
+    mouthQuarterX = face.mouth.width/4
+    mouthQuarterY = face.mouth.height/4
+
+    ctx.beginPath()
+    ctx.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY)
+    ctx.lineTo(face.mouth.x + mouthQuarterX*3, face.mouth.y+face.mouth.height)
+    ctx.lineTo(face.mouth.x + face.mouth.width, face.mouth.y+mouthQuarterY*3)
+    ctx.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y)
+    ctx.fill()
+    ctx.moveTo(face.mouth.x + mouthQuarterX*3, face.mouth.y)
+    ctx.lineTo(face.mouth.x, face.mouth.y+mouthQuarterY*3)
+    ctx.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
+    ctx.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
+    ctx.fill()
 
 
   isBegun: ->

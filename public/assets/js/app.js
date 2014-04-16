@@ -5,7 +5,7 @@
   $(function() {
     window.dev = true;
     window.log = function(args) {
-      if (false) {
+      if (true) {
         return console.log.apply(console, arguments);
       }
     };
@@ -364,6 +364,8 @@
   window.soundAnalyzer = (function() {
     function soundAnalyzer() {
       this.analyze = __bind(this.analyze, this);
+      this.all = 0;
+      this.counter = 0;
       this.low = 1000;
       this.high = 4000;
     }
@@ -391,7 +393,8 @@
       this.audioElement.addEventListener('ended', (function(_this) {
         return function() {
           _this.shouldAnalyze = false;
-          return console.log('ended');
+          log('average level: ' + _this.all / _this.counter);
+          return log('audio ended');
         };
       })(this), false);
       this.audioElement.addEventListener('playing', this.analyze, false);
@@ -409,8 +412,9 @@
       }
       this.high = Math.max(this.high, magnitude);
       this.low = Math.min(this.low, magnitude);
+      this.all += magnitude;
+      this.counter++;
       window.audioIntensity = magnitude / this.high;
-      console.log(audioIntensity);
       if (this.shouldAnalyze) {
         return setTimeout(this.analyze, 33);
       }
@@ -460,7 +464,6 @@
       if (this.empty(frames)) {
         faces = this.verifyFrameNumbers(faces, frames.length);
         faces = this.removeProbableFalse(faces);
-        faces = this.applyScale(faces);
         this.faceMap = faces;
         return faces;
       } else {
@@ -468,13 +471,14 @@
       }
     };
 
-    Faces.prototype.applyScale = function(faces) {
-      var face, _i, _len;
-      for (_i = 0, _len = faces.length; _i < _len; _i++) {
-        face = faces[_i];
-        face.applyScale(this.scale);
+    Faces.prototype.applyScale = function(scale) {
+      var face, _i, _len, _ref;
+      _ref = this.faceMap;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        face = _ref[_i];
+        face.applyScale(scale);
       }
-      return faces;
+      return this.faceMap;
     };
 
     Faces.prototype.removeProbableFalse = function(faces) {
@@ -524,6 +528,7 @@
 
     Faces.prototype.prepareForCanvas = function(faces) {
       var face, frame, frames, index, _i, _j, _len, _len1, _ref;
+      faces = faces || this.faceMap;
       frames = [];
       for (_i = 0, _len = faces.length; _i < _len; _i++) {
         face = faces[_i];
@@ -539,6 +544,16 @@
         }
       }
       return frames;
+    };
+
+    Faces.prototype.fillInBlanks = function() {
+      var face, _i, _len, _ref;
+      _ref = this.faceMap;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        face = _ref[_i];
+        face.fillInBlanks(3);
+      }
+      return this.faceMap;
     };
 
     Faces.prototype.removeAnomolies = function() {
@@ -818,6 +833,10 @@
           y: Math.round(frame.y + (frame.height / 5 * 2.8)),
           height: Math.round(frame.height / 2)
         };
+        frame.mouth.center = {
+          x: Math.round(frame.mouth.x + frame.mouth.width / 2),
+          y: Math.round(frame.mouth.y + frame.mouth.height / 2)
+        };
       }
       return this.frames;
     };
@@ -835,6 +854,41 @@
 
     Face.prototype.distance = function(obj1, obj2) {
       return Math.sqrt(Math.pow(obj1.x - obj2.x, 2) + Math.pow(obj1.y - obj2.y, 2));
+    };
+
+    Face.prototype.pulse = function(ctx, index, amount) {
+      var alpha, mouth, pulseAmount;
+      mouth = this.frames[index].mouth;
+      ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
+      ctx.beginPath();
+      pulseAmount = mouth.width / 3 * amount * 1.8;
+      ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false);
+      alpha = ((255 - audioIntensity * 255) + 100) / 200;
+      log(alpha);
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      return ctx.globalCompositeOperation = 'source-over';
+    };
+
+    Face.prototype.drawFace = function(ctx, index) {
+      var face, mouthQuarterX, mouthQuarterY;
+      face = this.frames[index];
+      ctx.fillStyle = 'rgba(5, 0, 0, 1.0)';
+      ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height);
+      mouthQuarterX = face.mouth.width / 4;
+      mouthQuarterY = face.mouth.height / 4;
+      ctx.beginPath();
+      ctx.moveTo(face.mouth.x, face.mouth.y + mouthQuarterY);
+      ctx.lineTo(face.mouth.x + mouthQuarterX * 3, face.mouth.y + face.mouth.height);
+      ctx.lineTo(face.mouth.x + face.mouth.width, face.mouth.y + mouthQuarterY * 3);
+      ctx.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y);
+      ctx.fill();
+      ctx.moveTo(face.mouth.x + mouthQuarterX * 3, face.mouth.y);
+      ctx.lineTo(face.mouth.x, face.mouth.y + mouthQuarterY * 3);
+      ctx.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y + face.mouth.height);
+      ctx.lineTo(face.mouth.x + face.mouth.width, face.mouth.y + mouthQuarterY);
+      return ctx.fill();
     };
 
     Face.prototype.isBegun = function() {
@@ -925,14 +979,10 @@
   });
 
   window.CanvasPlayer = (function() {
-    function CanvasPlayer(canvas, frames, fps, options) {
+    function CanvasPlayer(canvas, frames, fps) {
       this.canvas = canvas;
       this.frames = frames;
       this.fps = fps;
-      this.options = options;
-      this.options = this.options || {};
-      this.addSpacer = this.options.addSpacer;
-      this.progress = this.options.progress;
       this.paused = false;
       this.context = this.canvas.getContext('2d');
       this.index = 0;
@@ -963,36 +1013,26 @@
     };
 
     CanvasPlayer.prototype.play = function(options) {
-      if (options.player != null) {
-        this.player = options.player;
+      var frame;
+      if (options.onstart != null) {
+        options.onstart();
+        log('start');
+        options.onstart = null;
       }
       this.timeout = 1 / this.fps * 1000;
-      if (!this.paused) {
-        this.options = options || this.options;
-        if (this.endFrame > this.index) {
-          if (this.index <= this.startFrame) {
-            this.index = this.startFrame;
-            this.increment = true;
-          }
-          if (this.increment) {
-            this.index++;
-          } else {
-            this.index--;
-          }
-        } else {
-          if (!this.loop) {
-            if (this.options.ended) {
-              return this.options.ended();
-            }
-          }
-          if (this.loopStyle === 'beginning') {
-            this.index = this.startFrame;
-          } else {
-            this.index = this.endFrame - 1;
-            this.increment = false;
-          }
-        }
-        this.paintFrame(this.index);
+      this.options = options || this.options;
+      if (this.endFrame > this.index) {
+        this.index++;
+      } else {
+        return this.options.complete();
+      }
+      frame = this.frames[this.index];
+      if (this.options.preprocess != null) {
+        frame = this.options.preprocess(frame);
+      }
+      this.paintFrame(frame, this.index);
+      if (this.options.addition != null) {
+        this.options.addition(this.context, this.index);
       }
       return setTimeout((function(_this) {
         return function() {
@@ -1005,22 +1045,8 @@
       return this.paused = !this.paused;
     };
 
-    CanvasPlayer.prototype.paintFrame = function(index) {
-      var frame, spacer;
-      if (index >= this.frames.length || index < 0) {
-        return false;
-      }
-      this.index = index || this.index;
-      frame = this.frames[this.index];
-      if (this.addSpacer) {
-        spacer = Math.round((this.canvas.height - frame.width * 9 / 16) / 2);
-        this.context.putImageData(frame, 0, spacer);
-      } else {
-        this.context.putImageData(frame, 0, 0);
-      }
-      if (this.progress) {
-        return this.progress(index);
-      }
+    CanvasPlayer.prototype.paintFrame = function(frame, index) {
+      return this.context.putImageData(frame, 0, 0);
     };
 
     CanvasPlayer.prototype.cleanup = function() {
@@ -1036,23 +1062,9 @@
   })();
 
   window.Converter = (function() {
-    function Converter(canvas, frames, fps, player, options) {
-      this.canvas = canvas;
-      this.frames = frames;
-      this.fps = fps;
-      this.player = player;
+    function Converter(width, options) {
+      this.width = width;
       this.options = options || {};
-      this.convertCanvas = document.createElement('canvas');
-      this.convertCanvas.width = this.canvas.width;
-      this.convertCanvas.height = this.canvas.height;
-      this.convertContext = this.convertCanvas.getContext('2d');
-      this.files = [];
-      this.uploadedFiles = [];
-      this.formdata = new FormData();
-      this.fps = this.fps || 10;
-      this.save = false;
-      this.uploadedSprite;
-      this.gifFinished = options.gifFinished;
     }
 
     Converter.prototype.reset = function() {
@@ -1085,8 +1097,10 @@
       }
     };
 
-    Converter.prototype.runWorker = function() {
+    Converter.prototype.runWorker = function(frames, complete) {
       var frame, framesToProcess, worker, _i, _len, _results;
+      this.frames = frames;
+      this.complete = complete;
       worker = new Worker('/workers/findFaces.js');
       framesToProcess = (function() {
         var _i, _len, _ref, _results;
@@ -1101,26 +1115,14 @@
       this.foundFaces = [];
       worker.addEventListener('message', (function(_this) {
         return function(e) {
-          var bestBets, face, _i, _len;
+          var bestBets;
           log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
           log('start processing images now');
           _this.foundFaces.push(e.data);
           if (_this.foundFaces.length === framesToProcess.length) {
-            window.matchedFaces = new Faces(_this.foundFaces, player.displayWidth / 960);
+            window.matchedFaces = new Faces(_this.foundFaces, $(document).width() / _this.width);
             bestBets = matchedFaces.groupFaces();
-            if ((bestBets[0] != null) && bestBets[0].isBegun()) {
-              for (_i = 0, _len = bestBets.length; _i < _len; _i++) {
-                face = bestBets[_i];
-                face.fillInBlanks(3);
-                processor.zoomOnFace(face);
-              }
-              processor.queueEyebarSequence(matchedFaces.faceMap);
-            } else {
-              console.log('no go');
-            }
-            if (_this.options.converted != null) {
-              return _this.options.converted();
-            }
+            return _this.complete(bestBets, matchedFaces);
           }
         };
       })(this), false);
@@ -1403,7 +1405,6 @@
   window.Cropper = (function() {
     function Cropper(goalDimensions) {
       this.goalDimensions = goalDimensions;
-      this.spacer = (this.goalDimensions.height - this.goalDimensions.width * 9 / 16) / 2;
       this.transitionCanvas = this.createCanvas(this.goalDimensions);
       this.transitionContext = this.createContext(this.transitionCanvas);
       this.goalCanvas = this.createCanvas(this.goalDimensions);
@@ -1418,24 +1419,21 @@
 
     Cropper.prototype.start = function(callback) {
       this.doneCallback = callback || this.doneCallback;
-      this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift(), true));
+      this.finishedFrames.push(this.zoomToFit(this.currentFace, this.frameQueue.shift(), false));
       if (this.frameQueue.length > 0) {
         return setTimeout((function(_this) {
           return function() {
             return _this.start();
           };
-        })(this), 50);
+        })(this), 75);
       } else {
         return this.doneCallback(this.finishedFrames);
       }
     };
 
-    Cropper.prototype.zoomToFit = function(face, frame, transparent) {
+    Cropper.prototype.zoomToFit = function(face, frame, isolate) {
       var canvas, cropCoords, cropData, scaleFactor;
       cropCoords = this.convertFaceCoords(face);
-      if (frame == null) {
-        debugger;
-      }
       this.transitionContext.putImageData(frame, 0, 0);
       cropData = this.transitionContext.getImageData(cropCoords.x, cropCoords.y, cropCoords.width, cropCoords.height);
       scaleFactor = this.goalDimensions.width / cropCoords.width;
@@ -1448,20 +1446,66 @@
       this.goalContext.drawImage(canvas, 0, 0);
       this.goalContext.scale(1 / scaleFactor, 1 / scaleFactor);
       frame = this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
-      if (transparent) {
-        frame = this.makeTransparent(frame);
+      if (isolate) {
+        frame = this.isolateFace(face, frame);
       }
       return frame;
     };
 
-    Cropper.prototype.makeTransparent = function(frame) {
-      var center, diagonal, distance, frameWidth, idata, index, pixel, pixelNum, targetWidth, thisPixel, y, _i, _len;
+    Cropper.prototype.isolateFace = function(face, frame) {
+      var center;
+      log('isolate face');
+      this.goalContext.globalAlpha = 0.5;
+      this.goalContext.putImageData(frame, 0, 0);
+      this.goalContext.globalAlpha = 1;
+      center = {
+        x: frame.width / 2,
+        y: frame.height / 2
+      };
+      face = {
+        x: Math.round(center.x - frame.width / 8),
+        y: Math.round(center.y - frame.width / 14),
+        width: Math.round(frame.width / 5.5),
+        height: Math.round(frame.width / 3.4)
+      };
+      frame = this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
+      return frame = this.makeTransparent(frame, face.width);
+    };
+
+    Cropper.prototype.drawEllipseByCenter = function(ctx, cx, cy, w, h) {
+      return this.drawEllipse(ctx, cx - w / 2.0, cy - h / 2.0, w, h);
+    };
+
+    Cropper.prototype.drawEllipse = function(ctx, x, y, w, h) {
+      var kappa, ox, oy, xe, xm, ye, ym;
+      kappa = .5522848;
+      ox = (w / 2) * kappa;
+      oy = (h / 2) * kappa;
+      xe = x + w;
+      ye = y + h;
+      xm = x + w / 2;
+      ym = y + h / 2;
+      ctx.beginPath();
+      ctx.moveTo(x, ym);
+      ctx.bezierCurveTo(x, ym - oy, xm - ox, y, xm, y);
+      ctx.bezierCurveTo(xm + ox, y, xe, ym - oy, xe, ym);
+      ctx.bezierCurveTo(xe, ym + oy, xm + ox, ye, xm, ye);
+      ctx.bezierCurveTo(xm - ox, ye, x, ym + oy, x, ym);
+      ctx.closePath();
+      return ctx.stroke();
+    };
+
+    Cropper.prototype.makeTransparent = function(frame, width) {
+      var center, diagonal, distance, frameHeight, frameWidth, idata, index, midHeight, midWidth, pixel, pixelNum, targetWidth, thisPixel, y, _i, _len;
       targetWidth = 175;
       frameWidth = frame.width;
+      frameHeight = frame.height;
+      midHeight = frameHeight / 2;
+      midWidth = frameWidth / 2;
       idata = frame.data;
       center = {
         x: frame.width / 2,
-        y: frame.height / 2.7
+        y: frame.height / 2.2
       };
       diagonal = Math.sqrt(Math.pow(center.x, 2) + Math.pow(center.y, 2));
       for (index = _i = 0, _len = idata.length; _i < _len; index = _i += 4) {
@@ -1477,6 +1521,9 @@
           idata[index + 3] = 0;
         } else {
           distance = distance * 1.3;
+          if (Math.abs(midHeight - y) > targetWidth) {
+            targetWidth += 40;
+          }
           idata[index + 3] = 255 - (distance / targetWidth * 255);
         }
       }
@@ -1496,7 +1543,7 @@
       center_y = face.y + face.height / 2;
       return newCoords = {
         x: Math.round(center_x - width / 2),
-        y: Math.round(center_y - height / 1.9 + this.spacer),
+        y: Math.round(center_y - height / 1.9),
         width: Math.round(width),
         height: Math.round(height)
       };
@@ -1558,13 +1605,10 @@
   successCallback = function(stream) {
     window.webcam = stream;
     if (window.URL) {
-      webcam.src = window.URL.createObjectURL(stream);
+      return webcam.src = window.URL.createObjectURL(stream);
     } else {
-      webcam.src = stream;
+      return webcam.src = stream;
     }
-    return setTimeout(function() {
-      return $(window).trigger('click');
-    }, 1000);
   };
 
   errorCallback = function(error) {
@@ -1572,6 +1616,213 @@
   };
 
   navigator.getUserMedia(constraints, successCallback, errorCallback);
+
+  window.PlayController = (function() {
+    function PlayController() {
+      this.drawWebcam = __bind(this.drawWebcam, this);
+      this.started = {
+        yes: true
+      };
+      this.setDimensions();
+      this.recordCanvas = this.createCanvas(this.displayWidth);
+      this.recordCtx = this.createContext(this.recordCanvas);
+      this.smallRecord = this.createCanvas(720);
+      this.smallCtx = this.createContext(this.smallRecord);
+      this.recorder = new Recorder(this.recordCanvas);
+      this.smallRecorder = new Recorder(this.smallRecord);
+      this.video = $('#mainPlayer')[0];
+      this.canvas = $('#mainCanvas')[0];
+      this.canvas.width = this.recordCanvas.width;
+      this.canvas.height = this.recordCanvas.height;
+      this.ctx = this.canvas.getContext('2d');
+    }
+
+    PlayController.prototype.init = function() {
+      $(window).on('click', (function(_this) {
+        return function() {
+          $('h1').remove();
+          _this.video.play();
+          _this.webcam = $('#webcam')[0];
+          _this.webcam.src = webcam.src;
+          return _this.drawWebcam();
+        };
+      })(this));
+      return this.video.addEventListener('timeupdate', (function(_this) {
+        return function(e) {
+          return _this.checkTime(e);
+        };
+      })(this));
+    };
+
+    PlayController.prototype.drawWebcam = function() {
+      this.recordCtx.drawImage(this.webcam, 0, 0, this.recordCanvas.width, this.recordCanvas.height);
+      this.smallCtx.drawImage(this.webcam, 0, 0, this.smallRecord.width, this.smallRecord.height);
+      if (this.recordingComplete) {
+        return webcam.stop();
+      } else {
+        return requestAnimationFrame((function(_this) {
+          return function() {
+            return _this.drawWebcam();
+          };
+        })(this));
+      }
+    };
+
+    PlayController.prototype.checkTime = function(e) {
+      var time;
+      time = this.video.currentTime;
+      if (Math.floor(time) === 3) {
+        this.recordWebcam();
+      }
+      if (Math.floor(time) === 21) {
+        if (this.started.raw == null) {
+          this.playback('raw');
+        }
+      }
+      if (Math.floor(time) === 39) {
+        if (this.started.firstFace == null) {
+          this.playback('firstFace');
+        }
+      }
+      if (Math.floor(time) === 45) {
+        if (this.started.xFrames == null) {
+          this.playback('xFrames');
+        }
+      }
+      if (Math.floor(time) === 61) {
+        if (this.started.thirdFace == null) {
+          this.playback('thirdFace');
+        }
+      }
+      if (Math.floor(time) === 69) {
+        if (this.started.alphaFace == null) {
+          return this.playback('alphaFace');
+        }
+      }
+    };
+
+    PlayController.prototype.gameTime = function(e) {
+      var time;
+      time = this.video.currentTime;
+      if (Math.floor(time) === 127) {
+        this.recordWebcam();
+      }
+      if (Math.floor(time) === 180) {
+        if (this.started.firstFace == null) {
+          this.playback('firstFace');
+        }
+      }
+      if (Math.floor(time) === 187) {
+        if (this.started.secondFace == null) {
+          this.playback('secondFace');
+        }
+      }
+      if (Math.floor(time) === 194) {
+        if (this.started.thirdFace == null) {
+          return this.playback('thirdFace');
+        }
+      }
+    };
+
+    PlayController.prototype.playback = function(segment) {
+      if (segment === 'alphaFace') {
+        debugger;
+      }
+      log('play ' + segment);
+      this.started[segment] = true;
+      segment = this.smoker.segments[segment];
+      log('playing');
+      if (segment != null) {
+        window.cPlayer = new CanvasPlayer(this.canvas, segment.frames, 20);
+        return cPlayer.play({
+          preprocess: segment.preprocess,
+          postprocess: segment.postprocess,
+          onstart: segment.start,
+          addition: segment.addition,
+          complete: (function(_this) {
+            return function() {
+              _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
+              return log('done playing');
+            };
+          })(this)
+        });
+      } else {
+        return log('segment was not finished');
+      }
+    };
+
+    PlayController.prototype.recordWebcam = function() {
+      var secs;
+      secs = 3;
+      if (!this.recorder.started) {
+        log('start recording');
+        this.smoker = new Smoker(this.recordCanvas, this.recordCtx);
+        this.recorder.record(secs, 30, {
+          complete: (function(_this) {
+            return function() {
+              log('done recording');
+              _this.smoker.setFrames(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
+              _this.startProcessing(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
+              return _this.recordingComplete = true;
+            };
+          })(this)
+        });
+      }
+      if (!this.smallRecorder.started) {
+        return this.smallRecorder.record(secs, 30, {
+          complete: (function(_this) {
+            return function() {
+              _this.smoker.setSmall(_this.smallRecorder.capturedFrames);
+              _this.smoker.findFaces();
+              _this.recordingComplete = true;
+              return log('now find faces');
+            };
+          })(this)
+        });
+      }
+    };
+
+    PlayController.prototype.startProcessing = function(frames, fps) {
+      var faces;
+      frames = frames.slice(0);
+      window.processor = new Processor(frames, null, fps);
+      return faces = processor.bnwFrames = processor.blackandwhite({
+        complete: (function(_this) {
+          return function(bnwFrames) {
+            return _this.smoker.setBNW(bnwFrames);
+          };
+        })(this)
+      });
+    };
+
+    PlayController.prototype.findFaces = function() {
+      window.converter = new Converter(this.recorder.canvas, this.recorder.capturedFrames, this.recorder.fps, null, {
+        converted: function() {}
+      });
+      return converter.runWorker();
+    };
+
+    PlayController.prototype.setDimensions = function(canvas) {
+      this.displayWidth = $(document).width();
+      return this.displayHeight = $(document).height();
+    };
+
+    PlayController.prototype.createCanvas = function(width) {
+      var canvas;
+      canvas = document.createElement('canvas');
+      canvas.height = Math.ceil(width * 9 / 16);
+      canvas.width = width;
+      return canvas;
+    };
+
+    PlayController.prototype.createContext = function(canvas) {
+      var context;
+      return context = canvas.getContext('2d');
+    };
+
+    return PlayController;
+
+  })();
 
   $(function() {
     window.playbackCamSequence = new Sequence({
@@ -1629,7 +1880,7 @@
             log('time to add sequence to player');
             log("Total time took: " + (new Date().getTime() - _this.startedAt) / 1000 + 'secs');
             _this.playFrames = newFrames;
-            return _this.addSequence();
+            return options.complete(newFrames);
           } else {
             return worker.postMessage([_this.frames[newFrames.length]]);
           }
@@ -1817,6 +2068,7 @@
       this.context = this.canvas.getContext('2d');
       this.width = this.canvas.width;
       this.height = this.canvas.height;
+      this.started = false;
     }
 
     Recorder.prototype.reset = function() {
@@ -1827,6 +2079,7 @@
       var frames;
       this.fps = fps;
       this.options = options;
+      this.started = true;
       this.options = this.options || {};
       this.fps = this.fps || 30;
       seconds = seconds || 3;
@@ -1859,20 +2112,266 @@
 
   })();
 
+  window.Smoker = (function() {
+    function Smoker(canvas, context) {
+      this.canvas = canvas;
+      this.context = context;
+      this.drawAlphaFace = __bind(this.drawAlphaFace, this);
+      this.pulseMouths = __bind(this.pulseMouths, this);
+      this.pulseBlack = __bind(this.pulseBlack, this);
+      this.frames = [];
+      this.smallFrames = [];
+      this.bnwFrames = [];
+      this.segments = {};
+      this.xFrames = [];
+    }
+
+    Smoker.prototype.setBNW = function(frames) {
+      this.bnwFrames = frames.slice(0);
+      if ((this.faces != null) && this.xFrames.length === 0) {
+        return this.processXFrames();
+      }
+    };
+
+    Smoker.prototype.setFrames = function(frames, fps) {
+      this.frames = frames.slice(0);
+      this.width = this.frames[0].width;
+      this.height = this.frames[0].height;
+      this.segments.raw = {
+        frames: this.frames
+      };
+      return this.fps = fps;
+    };
+
+    Smoker.prototype.setSmall = function(frames) {
+      return this.smallFrames = frames.slice(0);
+    };
+
+    Smoker.prototype.findFaces = function() {
+      window.converter = new Converter(this.smallFrames[0].width);
+      return converter.runWorker(this.smallFrames, (function(_this) {
+        return function(faces, faceCollection) {
+          _this.faces = faces;
+          _this.faceCollection = faceCollection;
+          _this.faceCollection.applyScale(_this.frames[0].width / _this.smallFrames[0].width);
+          _this.faceCollection.fillInBlanks(3);
+          log('got all the faces', _this.faces);
+          if (_this.bnwFrames.length > 0 && _this.xFrames.length === 0) {
+            return _this.processXFrames();
+          }
+        };
+      })(this));
+    };
+
+    Smoker.prototype.processXFrames = function(inProcess, index) {
+      var frame;
+      inProcess = inProcess || this.bnwFrames.slice(0);
+      index = index || 0;
+      frame = inProcess.shift();
+      this.context.putImageData(frame, 0, 0);
+      this.drawFaces(this.context, index);
+      this.xFrames.push(this.context.getImageData(0, 0, this.canvas.width, this.canvas.height));
+      if (inProcess.length > 0) {
+        return setTimeout((function(_this) {
+          return function() {
+            index++;
+            return _this.processXFrames(inProcess, index);
+          };
+        })(this), 50);
+      } else {
+        log('done with processXFrames');
+        this.segments.xFrames = {
+          frames: this.xFrames,
+          addition: this.pulseMouths,
+          preprocess: this.pulseBlack
+        };
+        log('set up zooms');
+        return this.setupZooms();
+      }
+    };
+
+    Smoker.prototype.setupZooms = function() {
+      var i, zoomFaces, _i;
+      if (this.faces.length > 0) {
+        zoomFaces = [];
+        for (i = _i = 0; _i <= 2; i = ++_i) {
+          if (i < this.faces.length) {
+            zoomFaces[i] = this.faces[i];
+          } else {
+            zoomFaces[i] = this.faces[0];
+          }
+        }
+        return this.zoomOnFace(zoomFaces[0], (function(_this) {
+          return function(frames) {
+            log('zoom ready');
+            _this.segments.firstFace = {
+              frames: frames,
+              addition: _this.fadeInOut,
+              start: function() {
+                return new soundAnalyzer().playSound();
+              }
+            };
+            return _this.getSecondFace(zoomFaces);
+          };
+        })(this));
+      } else {
+        return log('no faces to zoom on');
+      }
+    };
+
+    Smoker.prototype.zoomOnFace = function(face, complete) {
+      var centerFace, crop, frames;
+      if ((face.frames == null) || face.frames.length < 7) {
+        return;
+      }
+      frames = this.bnwFrames.slice(0);
+      centerFace = face.frames[6];
+      crop = new Cropper({
+        width: this.width,
+        height: this.height
+      });
+      crop.queue(centerFace, frames);
+      return crop.start((function(_this) {
+        return function(frames) {
+          console.log('done running cropper');
+          return complete(frames);
+        };
+      })(this));
+    };
+
+    Smoker.prototype.getSecondFace = function(zoomFaces) {
+      return this.zoomOnFace(zoomFaces[1], (function(_this) {
+        return function(frames) {
+          _this.segments.secondFace = {
+            frames: frames,
+            addition: _this.fadeInOut
+          };
+          return _this.getThirdFace(zoomFaces);
+        };
+      })(this));
+    };
+
+    Smoker.prototype.getThirdFace = function(zoomFaces) {
+      return this.zoomOnFace(zoomFaces[2], (function(_this) {
+        return function(frames) {
+          _this.segments.thirdFace = {
+            frames: frames,
+            addition: _this.fadeInOut
+          };
+          return _this.getAlphaFace();
+        };
+      })(this));
+    };
+
+    Smoker.prototype.getAlphaFace = function() {
+      var crop, face, frame, i, _i;
+      log('get alpha face');
+      face = this.faces[0].frames[8];
+      frame = this.bnwFrames.slice(8, 9)[0];
+      crop = new Cropper({
+        width: this.width,
+        height: this.height
+      });
+      this.alphaFace = crop.zoomToFit(face, frame, true);
+      this.alphaFrames = [];
+      for (i = _i = 0; _i <= 30; i = ++_i) {
+        this.alphaFrames.push(this.alphaFace);
+      }
+      return this.segments.alphaFace = {
+        frames: this.alphaFrames,
+        addition: this.drawAlphaFace
+      };
+    };
+
+    Smoker.prototype.drawFaces = function(ctx, index) {
+      var face, _i, _len, _ref, _results;
+      if (this.faces.length > 0) {
+        _ref = this.faces;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          face = _ref[_i];
+          _results.push(face.drawFace(ctx, index));
+        }
+        return _results;
+      }
+    };
+
+    Smoker.prototype.pulseBlack = function(frame) {
+      var g, idata, index, pixel, r, trans, _i, _len;
+      log('pulse black');
+      idata = frame.data;
+      trans = Math.floor((255 - audioIntensity * 255) + 100);
+      for (index = _i = 0, _len = idata.length; _i < _len; index = _i += 4) {
+        pixel = idata[index];
+        r = idata[index];
+        g = idata[index + 1];
+        if (r === 5 && g === 0) {
+          idata[index + 3] = 0;
+        }
+      }
+      frame.data = idata;
+      return frame;
+    };
+
+    Smoker.prototype.fadeInOut = function(ctx, index) {
+      var alpha;
+      if (index < 45) {
+        alpha = 1 - index / 45;
+        ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
+        return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      } else if (index > 45) {
+        alpha = index % 45 / 45;
+        ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
+        return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      }
+    };
+
+    Smoker.prototype.pulseMouths = function(ctx, index) {
+      var face, _i, _len, _ref, _results;
+      if (this.faces.length > 0) {
+        _ref = this.faces;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          face = _ref[_i];
+          _results.push(face.pulse(ctx, index, audioIntensity));
+        }
+        return _results;
+      }
+    };
+
+    Smoker.prototype.drawAlphaFace = function(ctx, index) {
+      var face, frame;
+      frame = {
+        width: ctx.canvas.width,
+        height: ctx.canvas.height
+      };
+      face = {
+        eyebar: {
+          x: frame.width / 3,
+          y: frame.height / 3,
+          width: frame.width / 3,
+          height: frame.height / 12
+        }
+      };
+      ctx.fillStyle = 'black';
+      return ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height);
+    };
+
+    return Smoker;
+
+  })();
+
   $(function() {
-    window.faces = [];
-    window.player = new Player([
-      camSequence, testSequence, playbackCamSequence, new VideoTrack({
-        src: '/assets/videos/short.mov',
-        aspect: 16 / 9
-      }), playbackCamSequence
-    ]);
-    $(window).resize(function() {
+    var init;
+    window.video = $('video')[0];
+    window.audioIntensity = 0.5;
+    init = function() {
+      window.player = new PlayController();
+      return player.init();
+    };
+    init();
+    return $(window).resize(function() {
       return player.setDimensions();
-    });
-    return $(window).on('click', function() {
-      $('h1').remove();
-      return player.play();
     });
   });
 

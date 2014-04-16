@@ -1,6 +1,6 @@
 #!/bin/bash
 # open Chrome in kiosk mode with no extensions
-open "/Applications/Google Chrome.app" --args --enable-kiosk-mode --kiosk --disable-extensions https://smokescreen.dev
+open "/Applications/Google Chrome Canary.app" --args --enable-kiosk-mode --kiosk https://smokescreen.dev
 
 # fire up the face detection app
 cd ~/code/learning/face_det

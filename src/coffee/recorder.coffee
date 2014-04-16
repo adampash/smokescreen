@@ -4,12 +4,14 @@ class window.Recorder
     @context = @canvas.getContext('2d')
     @width = @canvas.width
     @height = @canvas.height
+    @started = false
 
   reset: ->
     @capturedFrames = []
 
 
   record: (seconds, @fps, @options) ->
+    @started = true
     @options = @options || {}
     @fps = @fps || 30
     seconds = seconds || 3
