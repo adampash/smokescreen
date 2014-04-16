@@ -494,6 +494,25 @@ class window.Face
     @started = null
 
 
+  getAverageFace: ->
+    return @averageFace if @averageFace?
+    allX = 0
+    allY = 0
+    allWidth = 0
+    allHeight = 0
+    for frame in @frames
+      allX += frame.x
+      allY += frame.y
+      allWidth += frame.width
+      allHeight += frame.height
+
+    length = @frames.length
+    @averageFace =
+      x: allX/length
+      y: allY/length
+      width: allWidth / length
+      height: allHeight / length
+
   applyScale: (scale) ->
     for frame in @frames
       for key of frame
@@ -1857,7 +1876,8 @@ class window.Smoker
 
     frames = @bnwFrames.slice(0)
 
-    centerFace = face.frames[6]
+    # centerFace = face.frames[6]
+    centerFace = face.getAverageFace()
     # TODO face.averageFace
     crop = new Cropper
       width: @width

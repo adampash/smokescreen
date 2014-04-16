@@ -637,6 +637,32 @@
       this.started = null;
     }
 
+    Face.prototype.getAverageFace = function() {
+      var allHeight, allWidth, allX, allY, frame, length, _i, _len, _ref;
+      if (this.averageFace != null) {
+        return this.averageFace;
+      }
+      allX = 0;
+      allY = 0;
+      allWidth = 0;
+      allHeight = 0;
+      _ref = this.frames;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        frame = _ref[_i];
+        allX += frame.x;
+        allY += frame.y;
+        allWidth += frame.width;
+        allHeight += frame.height;
+      }
+      length = this.frames.length;
+      return this.averageFace = {
+        x: allX / length,
+        y: allY / length,
+        width: allWidth / length,
+        height: allHeight / length
+      };
+    };
+
     Face.prototype.applyScale = function(scale) {
       var frame, key, _i, _len, _ref;
       _ref = this.frames;
@@ -2225,7 +2251,7 @@
         return;
       }
       frames = this.bnwFrames.slice(0);
-      centerFace = face.frames[6];
+      centerFace = face.getAverageFace();
       crop = new Cropper({
         width: this.width,
         height: this.height

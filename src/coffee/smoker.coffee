@@ -93,7 +93,8 @@ class window.Smoker
 
     frames = @bnwFrames.slice(0)
 
-    centerFace = face.frames[6]
+    # centerFace = face.frames[6]
+    centerFace = face.getAverageFace()
     # TODO face.averageFace
     crop = new Cropper
       width: @width
