@@ -49,13 +49,13 @@ class window.PlayController
   checkTime: (e) ->
     time = @video.currentTime
     # log time
-    if Math.floor(time) is 3
+    if Math.floor(time) is 2
       @recordWebcam()
     if Math.floor(time) is 21
       @playback('raw') unless @started.raw?
     if Math.floor(time) is 39
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 45
+    if Math.floor(time) is 52
       @playback('xFrames') unless @started.xFrames?
     # if Math.floor(time) is 49
     #   @playback('secondFace') unless @started.secondFace?
@@ -73,14 +73,16 @@ class window.PlayController
     if Math.floor(time) is 180
       @playback('firstFace') unless @started.firstFace?
     if Math.floor(time) is 187
+      @playback('xFrames') unless @started.xFrames?
+    if Math.floor(time) is 197
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 194
+    if Math.floor(time) is 204
       @playback('thirdFace') unless @started.thirdFace?
-    # if Math.floor(time) is 67
-    #   @playback('xFrames') unless @started.xFrames?
+    if Math.floor(time) is 210
+      @playback('alphaFace') unless @started.thirdFace?
 
   playback: (segment) ->
-    debugger if segment is 'alphaFace'
+    # debugger if segment is 'alphaFace'
     log 'play ' + segment
     @started[segment] = true
     segment = @smoker.segments[segment]

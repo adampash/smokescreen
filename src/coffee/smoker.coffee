@@ -18,6 +18,7 @@ class window.Smoker
     @height = @frames[0].height
     @segments.raw =
       frames: @frames
+      # preprocess: @cbrFilter
     @fps = fps
 
   setSmall: (frames) ->
@@ -76,11 +77,17 @@ class window.Smoker
           zoomFaces[i] = @faces[0]
       @zoomOnFace(zoomFaces[0], (frames) =>
         log 'zoom ready'
+        index = 0
+        until frames.length is 260
+          frames.push frames[index]
+          index++
+          if index > frames.length - 1
+            index = 0
         @segments.firstFace =
           frames: frames
           # addition: @pulseMouths
-          # preprocess: @pulseBlack
-          addition: @fadeInOut
+          preprocess: @alphaInOut
+          # addition: @fadeInOut
           start: ->
             new soundAnalyzer().playSound()
         @getSecondFace(zoomFaces)
@@ -116,7 +123,8 @@ class window.Smoker
     @zoomOnFace(zoomFaces[2], (frames) =>
       @segments.thirdFace =
         frames: frames
-        addition: @fadeInOut
+        # addition: @fadeInOut
+        preprocess: @cbrFilter
 
       @getAlphaFace()
     )
@@ -124,7 +132,8 @@ class window.Smoker
   getAlphaFace: ->
     log 'get alpha face'
     face = @faces[0].frames[8]
-    frame = @bnwFrames.slice(8, 9)[0]
+    # frame = @bnwFrames.slice(8, 9)[0]
+    frame = @frames.slice(8, 9)[0]
 
     crop = new Cropper
       width: @width
@@ -132,11 +141,12 @@ class window.Smoker
 
     @alphaFace = crop.zoomToFit(face, frame, true)
     @alphaFrames = []
-    for i in [0..30]
+    for i in [0..190]
       @alphaFrames.push @alphaFace
     @segments.alphaFace =
       frames: @alphaFrames
-      addition: @drawAlphaFace
+      # preprocess: @cbrFilter
+      # addition: @drawAlphaFace
 
   drawFaces: (ctx, index) ->
     if @faces.length > 0
@@ -144,7 +154,6 @@ class window.Smoker
         face.drawFace ctx, index
 
   pulseBlack: (frame) =>
-    log 'pulse black'
     idata = frame.data
     trans = Math.floor (255 - audioIntensity * 255) + 100
     # trans = 150 - trans
@@ -158,6 +167,7 @@ class window.Smoker
 
       # total = r + g + b
       # debugger
+      # if r is 5 and g is 0
       if r is 5 and g is 0
         # c = trans * 0.5
         # idata[index] = c
@@ -169,16 +179,39 @@ class window.Smoker
     frame.data = idata
     frame
 
+  cbrFilter: (frame) ->
+    # inProcess = inProcess or @frames.slice(0)
+    # index = index or 0
+    # frame = inProcess.shift()
+    process.cbrFilter frame
+
   fadeInOut: (ctx, index) ->
     # totalFrames = totalFrames or 90
     if index < 45
       alpha = 1 - index/45
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     else if index > 45
       alpha = index%45/45
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+  alphaInOut: (frame, index) ->
+    if index < 45
+      alpha = 255 * (1 - index/45)
+    else if index > 45
+      alpha = 255 * (index%45/45)
+
+    log index
+    log alpha
+    alpha = Math.floor alpha
+
+    idata = frame.data
+    for pixel, index in idata
+      idata[index+3] = alpha
+
+    frame.data = idata
+    frame
 
   pulseMouths: (ctx, index) =>
     if @faces.length > 0
@@ -190,16 +223,16 @@ class window.Smoker
       width: ctx.canvas.width
       height: ctx.canvas.height
 
-    face =
-      eyebar:
-        x: frame.width / 3
-        y: frame.height / 3
-        width: frame.width / 3
-        height: frame.height / 12
+    # face =
+    #   eyebar:
+    #     x: frame.width / 2.5
+    #     y: frame.height / 2.3
+    #     width: frame.width / 4.5
+    #     height: frame.height / 8
 
 
 
-    # ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'black'
+    # # ctx.globalCompositeOperation = 'destination-out'
+    # ctx.fillStyle = 'black'
 
-    ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+    # ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)

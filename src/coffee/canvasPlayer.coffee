@@ -41,7 +41,7 @@ class window.CanvasPlayer
         return @options.complete()
 
     frame = @frames[@index]
-    frame = @options.preprocess(frame) if @options.preprocess?
+    frame = @options.preprocess(frame, @index) if @options.preprocess?
     @paintFrame(frame, @index)
     @options.addition(@context, @index) if @options.addition?
     # if @options.postprocess?

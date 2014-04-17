@@ -55,9 +55,9 @@ class window.Cropper
 
   isolateFace: (face, frame) ->
     log 'isolate face'
-    @goalContext.globalAlpha = 0.5
-    @goalContext.putImageData frame, 0, 0
-    @goalContext.globalAlpha = 1
+    # @goalContext.globalAlpha = 0.5
+    # @goalContext.putImageData frame, 0, 0
+    # @goalContext.globalAlpha = 1
     # img = @goalCanvas.toDataURL()
 
     center =
@@ -68,16 +68,22 @@ class window.Cropper
     face =
       x: Math.round center.x - frame.width/8
       y: Math.round center.y - frame.width/14
-      width: Math.round frame.width/5.5
+      width: Math.round frame.width/5
       height: Math.round frame.width/3.4
-    # @goalContext.globalCompositeOperation = 'destination-in'
+    @goalContext.globalCompositeOperation = 'destination-in'
+    # @goalContext.globalCompositeOperation = 'multiply'
     # @goalContext.fillRect(face.x, face.y, face.width, face.height)
-    # @drawEllipseByCenter(@goalContext, center.x, center.y, face.width, face.height)
+    @drawEllipseByCenter(@goalContext, center.x, center.y, face.width, face.height)
+    @goalContext.fill()
 
-    # @goalContext.fill()
+    # @goalContext.globalCompositeOperation = 'multiply'
+    # frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+    # @goalContext.putImageData frame, 0, 0
+
 
     frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
-    frame = @makeTransparent frame, face.width
+    process.cbrFilter frame
+    # frame = @makeTransparent frame, face.width
     # idata = frame.data
     # for pixel, index in idata
     #   r = idata[index]

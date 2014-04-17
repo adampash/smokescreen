@@ -346,7 +346,7 @@ class window.Face
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
     alpha = ((255 - audioIntensity * 255) + 100) / 200
-    log alpha
+    # log alpha
 
     ctx.globalCompositeOperation = 'destination-out'
     ctx.fillStyle = 'black'

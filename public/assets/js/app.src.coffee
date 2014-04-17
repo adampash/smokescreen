@@ -689,7 +689,7 @@ class window.Face
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
     alpha = ((255 - audioIntensity * 255) + 100) / 200
-    log alpha
+    # log alpha
 
     ctx.globalCompositeOperation = 'destination-out'
     ctx.fillStyle = 'black'
@@ -831,7 +831,7 @@ class window.CanvasPlayer
         return @options.complete()
 
     frame = @frames[@index]
-    frame = @options.preprocess(frame) if @options.preprocess?
+    frame = @options.preprocess(frame, @index) if @options.preprocess?
     @paintFrame(frame, @index)
     @options.addition(@context, @index) if @options.addition?
     # if @options.postprocess?
@@ -1209,9 +1209,9 @@ class window.Cropper
 
   isolateFace: (face, frame) ->
     log 'isolate face'
-    @goalContext.globalAlpha = 0.5
-    @goalContext.putImageData frame, 0, 0
-    @goalContext.globalAlpha = 1
+    # @goalContext.globalAlpha = 0.5
+    # @goalContext.putImageData frame, 0, 0
+    # @goalContext.globalAlpha = 1
     # img = @goalCanvas.toDataURL()
 
     center =
@@ -1222,16 +1222,22 @@ class window.Cropper
     face =
       x: Math.round center.x - frame.width/8
       y: Math.round center.y - frame.width/14
-      width: Math.round frame.width/5.5
+      width: Math.round frame.width/5
       height: Math.round frame.width/3.4
-    # @goalContext.globalCompositeOperation = 'destination-in'
+    @goalContext.globalCompositeOperation = 'destination-in'
+    # @goalContext.globalCompositeOperation = 'multiply'
     # @goalContext.fillRect(face.x, face.y, face.width, face.height)
-    # @drawEllipseByCenter(@goalContext, center.x, center.y, face.width, face.height)
+    @drawEllipseByCenter(@goalContext, center.x, center.y, face.width, face.height)
+    @goalContext.fill()
 
-    # @goalContext.fill()
+    # @goalContext.globalCompositeOperation = 'multiply'
+    # frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
+    # @goalContext.putImageData frame, 0, 0
+
 
     frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
-    frame = @makeTransparent frame, face.width
+    process.cbrFilter frame
+    # frame = @makeTransparent frame, face.width
     # idata = frame.data
     # for pixel, index in idata
     #   r = idata[index]
@@ -1426,13 +1432,13 @@ class window.PlayController
   checkTime: (e) ->
     time = @video.currentTime
     # log time
-    if Math.floor(time) is 3
+    if Math.floor(time) is 2
       @recordWebcam()
     if Math.floor(time) is 21
       @playback('raw') unless @started.raw?
     if Math.floor(time) is 39
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 45
+    if Math.floor(time) is 52
       @playback('xFrames') unless @started.xFrames?
     # if Math.floor(time) is 49
     #   @playback('secondFace') unless @started.secondFace?
@@ -1450,14 +1456,16 @@ class window.PlayController
     if Math.floor(time) is 180
       @playback('firstFace') unless @started.firstFace?
     if Math.floor(time) is 187
+      @playback('xFrames') unless @started.xFrames?
+    if Math.floor(time) is 197
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 194
+    if Math.floor(time) is 204
       @playback('thirdFace') unless @started.thirdFace?
-    # if Math.floor(time) is 67
-    #   @playback('xFrames') unless @started.xFrames?
+    if Math.floor(time) is 210
+      @playback('alphaFace') unless @started.thirdFace?
 
   playback: (segment) ->
-    debugger if segment is 'alphaFace'
+    # debugger if segment is 'alphaFace'
     log 'play ' + segment
     @started[segment] = true
     segment = @smoker.segments[segment]
@@ -1562,6 +1570,35 @@ $ ->
     @callback() if @callback?
     @cleanup()
     @video.cleanup()
+
+window.process =
+  cbrFilter: (frame) ->
+    idata = frame.data
+
+    for pixel, index in idata by 4
+      r = idata[index]
+      g = idata[index+1]
+      b = idata[index+2]
+
+      y  = 0.299 * r + 0.587 * g + 0.114 * b
+      cB = 128 + (-0.169 * r + 0.331 * g + 0.5 * b)
+      cR = 128 + (0.5 * r - 0.419 * g - 0.081 * b)
+
+      if cR > 80 && cR > 127 && cB > 137 && cB < 165 && y > 26 && y < 226
+      # if r > 100
+       idata[index]   = 255
+       idata[index+1] = 255
+       idata[index+2] = 255
+       if audioIntensity?
+         alpha = ((255 - audioIntensity * 255) + 100) / 200
+       else
+         window.audioIntensity = 0
+       idata[index+3] = alpha
+      else
+       idata[index+3] = 0
+
+    frame.data = idata
+    frame
 
 class window.Processor
   constructor: (@frames, @faces, @options) ->
@@ -1801,6 +1838,7 @@ class window.Smoker
     @height = @frames[0].height
     @segments.raw =
       frames: @frames
+      # preprocess: @cbrFilter
     @fps = fps
 
   setSmall: (frames) ->
@@ -1859,11 +1897,17 @@ class window.Smoker
           zoomFaces[i] = @faces[0]
       @zoomOnFace(zoomFaces[0], (frames) =>
         log 'zoom ready'
+        index = 0
+        until frames.length is 260
+          frames.push frames[index]
+          index++
+          if index > frames.length - 1
+            index = 0
         @segments.firstFace =
           frames: frames
           # addition: @pulseMouths
-          # preprocess: @pulseBlack
-          addition: @fadeInOut
+          preprocess: @alphaInOut
+          # addition: @fadeInOut
           start: ->
             new soundAnalyzer().playSound()
         @getSecondFace(zoomFaces)
@@ -1899,7 +1943,8 @@ class window.Smoker
     @zoomOnFace(zoomFaces[2], (frames) =>
       @segments.thirdFace =
         frames: frames
-        addition: @fadeInOut
+        # addition: @fadeInOut
+        preprocess: @cbrFilter
 
       @getAlphaFace()
     )
@@ -1907,7 +1952,8 @@ class window.Smoker
   getAlphaFace: ->
     log 'get alpha face'
     face = @faces[0].frames[8]
-    frame = @bnwFrames.slice(8, 9)[0]
+    # frame = @bnwFrames.slice(8, 9)[0]
+    frame = @frames.slice(8, 9)[0]
 
     crop = new Cropper
       width: @width
@@ -1915,11 +1961,12 @@ class window.Smoker
 
     @alphaFace = crop.zoomToFit(face, frame, true)
     @alphaFrames = []
-    for i in [0..30]
+    for i in [0..190]
       @alphaFrames.push @alphaFace
     @segments.alphaFace =
       frames: @alphaFrames
-      addition: @drawAlphaFace
+      # preprocess: @cbrFilter
+      # addition: @drawAlphaFace
 
   drawFaces: (ctx, index) ->
     if @faces.length > 0
@@ -1927,7 +1974,6 @@ class window.Smoker
         face.drawFace ctx, index
 
   pulseBlack: (frame) =>
-    log 'pulse black'
     idata = frame.data
     trans = Math.floor (255 - audioIntensity * 255) + 100
     # trans = 150 - trans
@@ -1941,6 +1987,7 @@ class window.Smoker
 
       # total = r + g + b
       # debugger
+      # if r is 5 and g is 0
       if r is 5 and g is 0
         # c = trans * 0.5
         # idata[index] = c
@@ -1952,16 +1999,39 @@ class window.Smoker
     frame.data = idata
     frame
 
+  cbrFilter: (frame) ->
+    # inProcess = inProcess or @frames.slice(0)
+    # index = index or 0
+    # frame = inProcess.shift()
+    process.cbrFilter frame
+
   fadeInOut: (ctx, index) ->
     # totalFrames = totalFrames or 90
     if index < 45
       alpha = 1 - index/45
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
     else if index > 45
       alpha = index%45/45
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+
+  alphaInOut: (frame, index) ->
+    if index < 45
+      alpha = 255 * (1 - index/45)
+    else if index > 45
+      alpha = 255 * (index%45/45)
+
+    log index
+    log alpha
+    alpha = Math.floor alpha
+
+    idata = frame.data
+    for pixel, index in idata
+      idata[index+3] = alpha
+
+    frame.data = idata
+    frame
 
   pulseMouths: (ctx, index) =>
     if @faces.length > 0
@@ -1973,19 +2043,19 @@ class window.Smoker
       width: ctx.canvas.width
       height: ctx.canvas.height
 
-    face =
-      eyebar:
-        x: frame.width / 3
-        y: frame.height / 3
-        width: frame.width / 3
-        height: frame.height / 12
+    # face =
+    #   eyebar:
+    #     x: frame.width / 2.5
+    #     y: frame.height / 2.3
+    #     width: frame.width / 4.5
+    #     height: frame.height / 8
 
 
 
-    # ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'black'
+    # # ctx.globalCompositeOperation = 'destination-out'
+    # ctx.fillStyle = 'black'
 
-    ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
+    # ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
 
 
 

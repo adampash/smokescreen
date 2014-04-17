@@ -890,7 +890,6 @@
       pulseAmount = mouth.width / 3 * amount * 1.8;
       ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false);
       alpha = ((255 - audioIntensity * 255) + 100) / 200;
-      log(alpha);
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = 'black';
       ctx.fill();
@@ -1054,7 +1053,7 @@
       }
       frame = this.frames[this.index];
       if (this.options.preprocess != null) {
-        frame = this.options.preprocess(frame);
+        frame = this.options.preprocess(frame, this.index);
       }
       this.paintFrame(frame, this.index);
       if (this.options.addition != null) {
@@ -1481,9 +1480,6 @@
     Cropper.prototype.isolateFace = function(face, frame) {
       var center;
       log('isolate face');
-      this.goalContext.globalAlpha = 0.5;
-      this.goalContext.putImageData(frame, 0, 0);
-      this.goalContext.globalAlpha = 1;
       center = {
         x: frame.width / 2,
         y: frame.height / 2
@@ -1491,11 +1487,14 @@
       face = {
         x: Math.round(center.x - frame.width / 8),
         y: Math.round(center.y - frame.width / 14),
-        width: Math.round(frame.width / 5.5),
+        width: Math.round(frame.width / 5),
         height: Math.round(frame.width / 3.4)
       };
+      this.goalContext.globalCompositeOperation = 'destination-in';
+      this.drawEllipseByCenter(this.goalContext, center.x, center.y, face.width, face.height);
+      this.goalContext.fill();
       frame = this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
-      return frame = this.makeTransparent(frame, face.width);
+      return process.cbrFilter(frame);
     };
 
     Cropper.prototype.drawEllipseByCenter = function(ctx, cx, cy, w, h) {
@@ -1697,7 +1696,7 @@
     PlayController.prototype.checkTime = function(e) {
       var time;
       time = this.video.currentTime;
-      if (Math.floor(time) === 3) {
+      if (Math.floor(time) === 2) {
         this.recordWebcam();
       }
       if (Math.floor(time) === 21) {
@@ -1710,7 +1709,7 @@
           this.playback('firstFace');
         }
       }
-      if (Math.floor(time) === 45) {
+      if (Math.floor(time) === 52) {
         if (this.started.xFrames == null) {
           this.playback('xFrames');
         }
@@ -1739,21 +1738,28 @@
         }
       }
       if (Math.floor(time) === 187) {
+        if (this.started.xFrames == null) {
+          this.playback('xFrames');
+        }
+      }
+      if (Math.floor(time) === 197) {
         if (this.started.secondFace == null) {
           this.playback('secondFace');
         }
       }
-      if (Math.floor(time) === 194) {
+      if (Math.floor(time) === 204) {
         if (this.started.thirdFace == null) {
-          return this.playback('thirdFace');
+          this.playback('thirdFace');
+        }
+      }
+      if (Math.floor(time) === 210) {
+        if (this.started.thirdFace == null) {
+          return this.playback('alphaFace');
         }
       }
     };
 
     PlayController.prototype.playback = function(segment) {
-      if (segment === 'alphaFace') {
-        debugger;
-      }
       log('play ' + segment);
       this.started[segment] = true;
       segment = this.smoker.segments[segment];
@@ -1865,6 +1871,37 @@
       return this.video.cleanup();
     };
   });
+
+  window.process = {
+    cbrFilter: function(frame) {
+      var alpha, b, cB, cR, g, idata, index, pixel, r, y, _i, _len;
+      idata = frame.data;
+      for (index = _i = 0, _len = idata.length; _i < _len; index = _i += 4) {
+        pixel = idata[index];
+        r = idata[index];
+        g = idata[index + 1];
+        b = idata[index + 2];
+        y = 0.299 * r + 0.587 * g + 0.114 * b;
+        cB = 128 + (-0.169 * r + 0.331 * g + 0.5 * b);
+        cR = 128 + (0.5 * r - 0.419 * g - 0.081 * b);
+        if (cR > 80 && cR > 127 && cB > 137 && cB < 165 && y > 26 && y < 226) {
+          idata[index] = 255;
+          idata[index + 1] = 255;
+          idata[index + 2] = 255;
+          if (typeof audioIntensity !== "undefined" && audioIntensity !== null) {
+            alpha = ((255 - audioIntensity * 255) + 100) / 200;
+          } else {
+            window.audioIntensity = 0;
+          }
+          idata[index + 3] = alpha;
+        } else {
+          idata[index + 3] = 0;
+        }
+      }
+      frame.data = idata;
+      return frame;
+    }
+  };
 
   window.Processor = (function() {
     function Processor(frames, faces, options) {
@@ -2229,10 +2266,19 @@
         }
         return this.zoomOnFace(zoomFaces[0], (function(_this) {
           return function(frames) {
+            var index;
             log('zoom ready');
+            index = 0;
+            while (frames.length !== 260) {
+              frames.push(frames[index]);
+              index++;
+              if (index > frames.length - 1) {
+                index = 0;
+              }
+            }
             _this.segments.firstFace = {
               frames: frames,
-              addition: _this.fadeInOut,
+              preprocess: _this.alphaInOut,
               start: function() {
                 return new soundAnalyzer().playSound();
               }
@@ -2282,7 +2328,7 @@
         return function(frames) {
           _this.segments.thirdFace = {
             frames: frames,
-            addition: _this.fadeInOut
+            preprocess: _this.cbrFilter
           };
           return _this.getAlphaFace();
         };
@@ -2293,19 +2339,18 @@
       var crop, face, frame, i, _i;
       log('get alpha face');
       face = this.faces[0].frames[8];
-      frame = this.bnwFrames.slice(8, 9)[0];
+      frame = this.frames.slice(8, 9)[0];
       crop = new Cropper({
         width: this.width,
         height: this.height
       });
       this.alphaFace = crop.zoomToFit(face, frame, true);
       this.alphaFrames = [];
-      for (i = _i = 0; _i <= 30; i = ++_i) {
+      for (i = _i = 0; _i <= 190; i = ++_i) {
         this.alphaFrames.push(this.alphaFace);
       }
       return this.segments.alphaFace = {
-        frames: this.alphaFrames,
-        addition: this.drawAlphaFace
+        frames: this.alphaFrames
       };
     };
 
@@ -2324,7 +2369,6 @@
 
     Smoker.prototype.pulseBlack = function(frame) {
       var g, idata, index, pixel, r, trans, _i, _len;
-      log('pulse black');
       idata = frame.data;
       trans = Math.floor((255 - audioIntensity * 255) + 100);
       for (index = _i = 0, _len = idata.length; _i < _len; index = _i += 4) {
@@ -2339,17 +2383,39 @@
       return frame;
     };
 
+    Smoker.prototype.cbrFilter = function(frame) {
+      return process.cbrFilter(frame);
+    };
+
     Smoker.prototype.fadeInOut = function(ctx, index) {
       var alpha;
       if (index < 45) {
         alpha = 1 - index / 45;
         ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
-        return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       } else if (index > 45) {
         alpha = index % 45 / 45;
         ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
-        return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       }
+      return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    };
+
+    Smoker.prototype.alphaInOut = function(frame, index) {
+      var alpha, idata, pixel, _i, _len;
+      if (index < 45) {
+        alpha = 255 * (1 - index / 45);
+      } else if (index > 45) {
+        alpha = 255 * (index % 45 / 45);
+      }
+      log(index);
+      log(alpha);
+      alpha = Math.floor(alpha);
+      idata = frame.data;
+      for (index = _i = 0, _len = idata.length; _i < _len; index = ++_i) {
+        pixel = idata[index];
+        idata[index + 3] = alpha;
+      }
+      frame.data = idata;
+      return frame;
     };
 
     Smoker.prototype.pulseMouths = function(ctx, index) {
@@ -2366,21 +2432,11 @@
     };
 
     Smoker.prototype.drawAlphaFace = function(ctx, index) {
-      var face, frame;
-      frame = {
+      var frame;
+      return frame = {
         width: ctx.canvas.width,
         height: ctx.canvas.height
       };
-      face = {
-        eyebar: {
-          x: frame.width / 3,
-          y: frame.height / 3,
-          width: frame.width / 3,
-          height: frame.height / 12
-        }
-      };
-      ctx.fillStyle = 'black';
-      return ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height);
     };
 
     return Smoker;
