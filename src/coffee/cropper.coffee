@@ -1,4 +1,4 @@
-class window.Cropper
+class Cropper
   constructor: (@goalDimensions) ->
     # @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
 
@@ -19,12 +19,12 @@ class window.Cropper
     @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift(), false
     if @frameQueue.length > 0
       setTimeout =>
+        log @frameQueue.length
         @start()
-      , 75
+      , 50
     else
+      log 'zoomed on all frames'
       @doneCallback @finishedFrames
-
-
 
   zoomToFit: (face, frame, isolate) ->
     # debugger if isolate
@@ -49,7 +49,7 @@ class window.Cropper
     @goalContext.scale 1/scaleFactor, 1/scaleFactor
     frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
 
-    frame = @isolateFace(face, frame) if isolate
+    # frame = @isolateFace(face, frame) if isolate
 
     frame
 

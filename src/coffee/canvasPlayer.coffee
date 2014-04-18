@@ -1,4 +1,4 @@
-class window.CanvasPlayer
+class CanvasPlayer
   constructor: (@canvas, @frames, @fps) ->
     # @options = @options || {}
     # @addSpacer = @options.addSpacer
@@ -29,16 +29,28 @@ class window.CanvasPlayer
       @canvas.height = @player.displayHeight
 
   play: (options) ->
+    if @stop
+      @options.complete()
+      return @stop = !@stop
     if options.onstart?
       options.onstart()
       log 'start'
       options.onstart = null
     @timeout = 1/@fps * 1000
     @options = options || @options
-    if @endFrame > @index
-      @index++
+    if @increment and @endFrame > @index
+        @index++
+    else if !@increment and @index > 0
+      @index--
+    else if @options.loop? and @options.loop
+      log 'decrement'
+      @increment = !@increment
+      if @increment
+        @index++
+      else
+        @index--
     else
-        return @options.complete()
+      return @options.complete()
 
     frame = @frames[@index]
     frame = @options.preprocess(frame, @index) if @options.preprocess?
@@ -53,6 +65,10 @@ class window.CanvasPlayer
     setTimeout =>
       @play(options)
     , @timeout
+
+
+  timestamp: ->
+    if window.performance and window.performance.now then window.performance.now() else new Date().getTime()
 
   pause: ->
     @paused = !@paused

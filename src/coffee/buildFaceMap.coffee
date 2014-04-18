@@ -1,4 +1,4 @@
-class window.Faces
+class Faces
   constructor: (faces, @scale) ->
     if faces.length?
       @allFaces = @flatten faces
@@ -7,6 +7,12 @@ class window.Faces
     @calculateAvgFace()
 
     @facesByFrames = faces
+
+  sortByCertainty: (faces) ->
+    faces.sort (a, b) ->
+      b.certainty - a.certainty
+    faces
+
 
   groupFaces: (frames, faces) ->
     if !frames?
@@ -145,7 +151,7 @@ class window.Faces
     @avgFace = totalFaceArea / @numFaces
 
 
-class window.Face
+class Face
   constructor: () ->
     @frames = []
     @started = null
@@ -177,7 +183,7 @@ class window.Face
     @
 
   probability: ->
-    1 - @emptyFrames() / @frames.length
+    @certainty = 1 - @emptyFrames() / @frames.length
 
   emptyFrames: ->
     numEmpty = 0
@@ -320,7 +326,7 @@ class window.Face
       frame.mouth =
         x: Math.round(frame.x + frame.width/4)
         width: Math.round(frame.width/2)
-        y: Math.round(frame.y + (frame.height/5*2.8))
+        y: Math.round(frame.y + (frame.height/5*3.2))
         height: Math.round(frame.height/2)
       frame.mouth.center =
         x: Math.round frame.mouth.x + frame.mouth.width/2
@@ -337,30 +343,48 @@ class window.Face
   distance: (obj1, obj2) ->
     Math.sqrt(Math.pow((obj1.x - obj2.x), 2) + Math.pow((obj1.y - obj2.y), 2))
 
-  pulse: (ctx, index, amount) ->
+  pulse: (ctx, index, amount, type) ->
     mouth = @frames[index].mouth
 
     ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
     ctx.beginPath()
-    pulseAmount = mouth.width/3 * amount * 1.8
+    pulseAmount = mouth.width/3 * amount * 1.5
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
-    alpha = ((255 - audioIntensity * 255) + 100) / 200
+    # alpha = ((255 - audioIntensity * 255) + 100) / 200
     # log alpha
 
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'black'
+    # log type
+    ctx.globalCompositeOperation = 'source-over'
+    if type is 1
+      ctx.fillStyle = 'white'
+    else if type is 4
+      ctx.fillStyle = 'black'
+    else if type is 2
+      ctx.fillStyle = 'black'
+    else
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = 'black'
+
     ctx.fill()
     ctx.globalCompositeOperation = 'source-over'
 
-  drawFace: (ctx, index) ->
+  drawFace: (ctx, index, type) ->
     face = @frames[index]
 
-    ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
+    if type is 1
+      ctx.fillStyle = 'black'
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+      ctx.fillStyle = 'white'
+    else if type is 4
+      ctx.fillStyle = 'black'
+    else if type is 2
+      ctx.fillStyle = 'black'
+    else if type is 3
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = 'black'
+      # ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
     ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
-    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
-
-    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
 
     mouthQuarterX = face.mouth.width/4
     mouthQuarterY = face.mouth.height/4
@@ -376,6 +400,8 @@ class window.Face
     ctx.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
     ctx.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
     ctx.fill()
+
+    ctx.globalCompositeOperation = 'source-over'
 
 
   isBegun: ->

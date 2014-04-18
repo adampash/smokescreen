@@ -1,4 +1,4 @@
-class window.PlayController
+class PlayController
   constructor: ->
     @started =
       yes: true
@@ -51,18 +51,30 @@ class window.PlayController
     # log time
     if Math.floor(time) is 2
       @recordWebcam()
-    if Math.floor(time) is 21
-      @playback('raw') unless @started.raw?
-    if Math.floor(time) is 39
-      @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 52
+    # if Math.floor(time) is 21
+    #   @playback('raw') unless @started.raw?
+    if Math.floor(time) is 20
       @playback('xFrames') unless @started.xFrames?
-    # if Math.floor(time) is 49
-    #   @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 61
-      @playback('thirdFace') unless @started.thirdFace?
-    if Math.floor(time) is 69
-      @playback('alphaFace') unless @started.alphaFace?
+    if Math.floor(time) is 28
+      log 'stop player'
+      # @cPlayer.stop = true
+      @smoker.stopIn = 10
+    if Math.floor(time) is 30
+      @playback('firstFace') unless @started.firstFace?
+    if Math.floor(time) is 49
+      log 'stop player'
+      @cPlayer.stop = true
+    if Math.floor(time) is 50
+      @playback('secondFace') unless @started.secondFace?
+    if Math.floor(time) is 73
+      @playback('xFrames2') unless @started.xFrames2?
+    if Math.floor(time) is 85
+      log 'stop player'
+      @cPlayer.stop = true
+    if Math.floor(time) is 86
+      @playback('xFrames3') unless @started.xFrames3?
+    if Math.floor(time) is 90
+      @ctx.putImageData(@smoker.xFrames2[9], 0, 0)
 
   gameTime: (e) ->
     time = @video.currentTime
@@ -88,8 +100,9 @@ class window.PlayController
     segment = @smoker.segments[segment]
     log 'playing'
     if segment?
-      window.cPlayer = new CanvasPlayer @canvas, segment.frames, 20 #@smoker.fps
-      cPlayer.play
+      @cPlayer = new CanvasPlayer @canvas, segment.frames, 15 #@smoker.fps
+      @cPlayer.play
+        loop:       segment.loop
         preprocess: segment.preprocess
         postprocess: segment.postprocess
         onstart: segment.start
@@ -97,25 +110,22 @@ class window.PlayController
         complete: =>
           @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
           log 'done playing'
+          segment.complete() if segment.complete?
     else
       log 'segment was not finished'
 
 
-    # @ctx.putImageData
-    # @ctx.fillStyle = "black"
-    # @ctx.fillRect(10, 10, 300, 200)
-
   recordWebcam: ->
-    secs = 3
+    secs = 2
     unless @recorder.started
       log 'start recording'
-      @smoker = new Smoker(@recordCanvas, @recordCtx)
+      @smoker = new Smoker(@recordCanvas, @recordCtx, @)
 
       @recorder.record secs, 30,
         complete: =>
           log 'done recording'
           @smoker.setFrames @recorder.capturedFrames.slice(0), @recorder.fps
-          @startProcessing @recorder.capturedFrames.slice(0), @recorder.fps
+          @startProcessing @recorder.capturedFrames, @recorder.fps
           @recordingComplete = true
 
     unless @smallRecorder.started
@@ -125,17 +135,20 @@ class window.PlayController
           @smoker.findFaces()
           @recordingComplete = true
           log 'now find faces'
+          @smallRecorder = null
 
   startProcessing: (frames, fps) ->
     frames = frames.slice(0)
-    window.processor = new Processor frames, null, fps
+    @recorder.capturedFrames = null
+    processor = new Processor frames, null, fps
     faces = processor.
     bnwFrames = processor.blackandwhite
       complete: (bnwFrames) =>
         @smoker.setBNW(bnwFrames)
+        bnwFrames = null
 
   findFaces: ->
-    window.converter = new Converter @recorder.canvas,
+    converter = new Converter @recorder.canvas,
                         @recorder.capturedFrames,
                         @recorder.fps,
                         null,

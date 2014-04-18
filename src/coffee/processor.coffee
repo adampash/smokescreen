@@ -1,4 +1,4 @@
-class window.Processor
+class Processor
   constructor: (@frames, @faces, @options) ->
     @newFrames = []
     @playFrames = []

@@ -1,4 +1,4 @@
-class window.soundAnalyzer
+class soundAnalyzer
   constructor: ->
     @all = 0
     @counter = 0

@@ -1,5 +1,5 @@
 (function() {
-  var constraints, errorCallback, successCallback,
+  var CanvasPlayer, Converter, Cropper, Face, Faces, PlayController, Processor, Recorder, Smoker, constraints, errorCallback, soundAnalyzer, successCallback,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
@@ -361,7 +361,7 @@
     })();
   });
 
-  window.soundAnalyzer = (function() {
+  soundAnalyzer = (function() {
     function soundAnalyzer() {
       this.analyze = __bind(this.analyze, this);
       this.all = 0;
@@ -424,7 +424,7 @@
 
   })();
 
-  window.Faces = (function() {
+  Faces = (function() {
     function Faces(faces, scale) {
       this.scale = scale;
       if (faces.length != null) {
@@ -435,6 +435,13 @@
       this.calculateAvgFace();
       this.facesByFrames = faces;
     }
+
+    Faces.prototype.sortByCertainty = function(faces) {
+      faces.sort(function(a, b) {
+        return b.certainty - a.certainty;
+      });
+      return faces;
+    };
 
     Faces.prototype.groupFaces = function(frames, faces) {
       var firstFace, frameNumber, i, thisFace;
@@ -631,7 +638,7 @@
 
   })();
 
-  window.Face = (function() {
+  Face = (function() {
     function Face() {
       this.frames = [];
       this.started = null;
@@ -676,7 +683,7 @@
     };
 
     Face.prototype.probability = function() {
-      return 1 - this.emptyFrames() / this.frames.length;
+      return this.certainty = 1 - this.emptyFrames() / this.frames.length;
     };
 
     Face.prototype.emptyFrames = function() {
@@ -856,7 +863,7 @@
         frame.mouth = {
           x: Math.round(frame.x + frame.width / 4),
           width: Math.round(frame.width / 2),
-          y: Math.round(frame.y + (frame.height / 5 * 2.8)),
+          y: Math.round(frame.y + (frame.height / 5 * 3.2)),
           height: Math.round(frame.height / 2)
         };
         frame.mouth.center = {
@@ -882,24 +889,43 @@
       return Math.sqrt(Math.pow(obj1.x - obj2.x, 2) + Math.pow(obj1.y - obj2.y, 2));
     };
 
-    Face.prototype.pulse = function(ctx, index, amount) {
-      var alpha, mouth, pulseAmount;
+    Face.prototype.pulse = function(ctx, index, amount, type) {
+      var mouth, pulseAmount;
       mouth = this.frames[index].mouth;
       ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
       ctx.beginPath();
-      pulseAmount = mouth.width / 3 * amount * 1.8;
+      pulseAmount = mouth.width / 3 * amount * 1.5;
       ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false);
-      alpha = ((255 - audioIntensity * 255) + 100) / 200;
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.fillStyle = 'black';
+      ctx.globalCompositeOperation = 'source-over';
+      if (type === 1) {
+        ctx.fillStyle = 'white';
+      } else if (type === 4) {
+        ctx.fillStyle = 'black';
+      } else if (type === 2) {
+        ctx.fillStyle = 'black';
+      } else {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'black';
+      }
       ctx.fill();
       return ctx.globalCompositeOperation = 'source-over';
     };
 
-    Face.prototype.drawFace = function(ctx, index) {
+    Face.prototype.drawFace = function(ctx, index, type) {
       var face, mouthQuarterX, mouthQuarterY;
       face = this.frames[index];
-      ctx.fillStyle = 'rgba(5, 0, 0, 1.0)';
+      if (type === 1) {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.fillStyle = 'white';
+      } else if (type === 4) {
+        ctx.fillStyle = 'black';
+      } else if (type === 2) {
+        ctx.fillStyle = 'black';
+      } else if (type === 3) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'black';
+      }
       ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height);
       mouthQuarterX = face.mouth.width / 4;
       mouthQuarterY = face.mouth.height / 4;
@@ -913,7 +939,8 @@
       ctx.lineTo(face.mouth.x, face.mouth.y + mouthQuarterY * 3);
       ctx.lineTo(face.mouth.x + mouthQuarterX, face.mouth.y + face.mouth.height);
       ctx.lineTo(face.mouth.x + face.mouth.width, face.mouth.y + mouthQuarterY);
-      return ctx.fill();
+      ctx.fill();
+      return ctx.globalCompositeOperation = 'source-over';
     };
 
     Face.prototype.isBegun = function() {
@@ -1003,7 +1030,7 @@
     };
   });
 
-  window.CanvasPlayer = (function() {
+  CanvasPlayer = (function() {
     function CanvasPlayer(canvas, frames, fps) {
       this.canvas = canvas;
       this.frames = frames;
@@ -1039,6 +1066,10 @@
 
     CanvasPlayer.prototype.play = function(options) {
       var frame;
+      if (this.stop) {
+        this.options.complete();
+        return this.stop = !this.stop;
+      }
       if (options.onstart != null) {
         options.onstart();
         log('start');
@@ -1046,8 +1077,18 @@
       }
       this.timeout = 1 / this.fps * 1000;
       this.options = options || this.options;
-      if (this.endFrame > this.index) {
+      if (this.increment && this.endFrame > this.index) {
         this.index++;
+      } else if (!this.increment && this.index > 0) {
+        this.index--;
+      } else if ((this.options.loop != null) && this.options.loop) {
+        log('decrement');
+        this.increment = !this.increment;
+        if (this.increment) {
+          this.index++;
+        } else {
+          this.index--;
+        }
       } else {
         return this.options.complete();
       }
@@ -1064,6 +1105,14 @@
           return _this.play(options);
         };
       })(this), this.timeout);
+    };
+
+    CanvasPlayer.prototype.timestamp = function() {
+      if (window.performance && window.performance.now) {
+        return window.performance.now();
+      } else {
+        return new Date().getTime();
+      }
     };
 
     CanvasPlayer.prototype.pause = function() {
@@ -1086,7 +1135,7 @@
 
   })();
 
-  window.Converter = (function() {
+  Converter = (function() {
     function Converter(width, options) {
       this.width = width;
       this.options = options || {};
@@ -1427,7 +1476,7 @@
 
   })();
 
-  window.Cropper = (function() {
+  Cropper = (function() {
     function Cropper(goalDimensions) {
       this.goalDimensions = goalDimensions;
       this.transitionCanvas = this.createCanvas(this.goalDimensions);
@@ -1448,10 +1497,12 @@
       if (this.frameQueue.length > 0) {
         return setTimeout((function(_this) {
           return function() {
+            log(_this.frameQueue.length);
             return _this.start();
           };
-        })(this), 75);
+        })(this), 50);
       } else {
+        log('zoomed on all frames');
         return this.doneCallback(this.finishedFrames);
       }
     };
@@ -1471,9 +1522,6 @@
       this.goalContext.drawImage(canvas, 0, 0);
       this.goalContext.scale(1 / scaleFactor, 1 / scaleFactor);
       frame = this.goalContext.getImageData(0, 0, this.goalCanvas.width, this.goalCanvas.height);
-      if (isolate) {
-        frame = this.isolateFace(face, frame);
-      }
       return frame;
     };
 
@@ -1642,7 +1690,7 @@
 
   navigator.getUserMedia(constraints, successCallback, errorCallback);
 
-  window.PlayController = (function() {
+  PlayController = (function() {
     function PlayController() {
       this.drawWebcam = __bind(this.drawWebcam, this);
       this.started = {
@@ -1699,30 +1747,45 @@
       if (Math.floor(time) === 2) {
         this.recordWebcam();
       }
-      if (Math.floor(time) === 21) {
-        if (this.started.raw == null) {
-          this.playback('raw');
-        }
-      }
-      if (Math.floor(time) === 39) {
-        if (this.started.firstFace == null) {
-          this.playback('firstFace');
-        }
-      }
-      if (Math.floor(time) === 52) {
+      if (Math.floor(time) === 20) {
         if (this.started.xFrames == null) {
           this.playback('xFrames');
         }
       }
-      if (Math.floor(time) === 61) {
-        if (this.started.thirdFace == null) {
-          this.playback('thirdFace');
+      if (Math.floor(time) === 28) {
+        log('stop player');
+        this.smoker.stopIn = 10;
+      }
+      if (Math.floor(time) === 30) {
+        if (this.started.firstFace == null) {
+          this.playback('firstFace');
         }
       }
-      if (Math.floor(time) === 69) {
-        if (this.started.alphaFace == null) {
-          return this.playback('alphaFace');
+      if (Math.floor(time) === 49) {
+        log('stop player');
+        this.cPlayer.stop = true;
+      }
+      if (Math.floor(time) === 50) {
+        if (this.started.secondFace == null) {
+          this.playback('secondFace');
         }
+      }
+      if (Math.floor(time) === 73) {
+        if (this.started.xFrames2 == null) {
+          this.playback('xFrames2');
+        }
+      }
+      if (Math.floor(time) === 85) {
+        log('stop player');
+        this.cPlayer.stop = true;
+      }
+      if (Math.floor(time) === 86) {
+        if (this.started.xFrames3 == null) {
+          this.playback('xFrames3');
+        }
+      }
+      if (Math.floor(time) === 90) {
+        return this.ctx.putImageData(this.smoker.xFrames2[9], 0, 0);
       }
     };
 
@@ -1765,8 +1828,9 @@
       segment = this.smoker.segments[segment];
       log('playing');
       if (segment != null) {
-        window.cPlayer = new CanvasPlayer(this.canvas, segment.frames, 20);
-        return cPlayer.play({
+        this.cPlayer = new CanvasPlayer(this.canvas, segment.frames, 15);
+        return this.cPlayer.play({
+          loop: segment.loop,
           preprocess: segment.preprocess,
           postprocess: segment.postprocess,
           onstart: segment.start,
@@ -1774,7 +1838,10 @@
           complete: (function(_this) {
             return function() {
               _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
-              return log('done playing');
+              log('done playing');
+              if (segment.complete != null) {
+                return segment.complete();
+              }
             };
           })(this)
         });
@@ -1785,16 +1852,16 @@
 
     PlayController.prototype.recordWebcam = function() {
       var secs;
-      secs = 3;
+      secs = 2;
       if (!this.recorder.started) {
         log('start recording');
-        this.smoker = new Smoker(this.recordCanvas, this.recordCtx);
+        this.smoker = new Smoker(this.recordCanvas, this.recordCtx, this);
         this.recorder.record(secs, 30, {
           complete: (function(_this) {
             return function() {
               log('done recording');
               _this.smoker.setFrames(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
-              _this.startProcessing(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
+              _this.startProcessing(_this.recorder.capturedFrames, _this.recorder.fps);
               return _this.recordingComplete = true;
             };
           })(this)
@@ -1807,7 +1874,8 @@
               _this.smoker.setSmall(_this.smallRecorder.capturedFrames);
               _this.smoker.findFaces();
               _this.recordingComplete = true;
-              return log('now find faces');
+              log('now find faces');
+              return _this.smallRecorder = null;
             };
           })(this)
         });
@@ -1815,20 +1883,23 @@
     };
 
     PlayController.prototype.startProcessing = function(frames, fps) {
-      var faces;
+      var faces, processor;
       frames = frames.slice(0);
-      window.processor = new Processor(frames, null, fps);
+      this.recorder.capturedFrames = null;
+      processor = new Processor(frames, null, fps);
       return faces = processor.bnwFrames = processor.blackandwhite({
         complete: (function(_this) {
           return function(bnwFrames) {
-            return _this.smoker.setBNW(bnwFrames);
+            _this.smoker.setBNW(bnwFrames);
+            return bnwFrames = null;
           };
         })(this)
       });
     };
 
     PlayController.prototype.findFaces = function() {
-      window.converter = new Converter(this.recorder.canvas, this.recorder.capturedFrames, this.recorder.fps, null, {
+      var converter;
+      converter = new Converter(this.recorder.canvas, this.recorder.capturedFrames, this.recorder.fps, null, {
         converted: function() {}
       });
       return converter.runWorker();
@@ -1903,7 +1974,7 @@
     }
   };
 
-  window.Processor = (function() {
+  Processor = (function() {
     function Processor(frames, faces, options) {
       this.frames = frames;
       this.faces = faces;
@@ -2123,7 +2194,7 @@
 
   })();
 
-  window.Recorder = (function() {
+  Recorder = (function() {
     function Recorder(canvas) {
       this.canvas = canvas;
       this.captureFrames = __bind(this.captureFrames, this);
@@ -2175,10 +2246,11 @@
 
   })();
 
-  window.Smoker = (function() {
-    function Smoker(canvas, context) {
+  Smoker = (function() {
+    function Smoker(canvas, context, player) {
       this.canvas = canvas;
       this.context = context;
+      this.player = player;
       this.drawAlphaFace = __bind(this.drawAlphaFace, this);
       this.pulseMouths = __bind(this.pulseMouths, this);
       this.pulseBlack = __bind(this.pulseBlack, this);
@@ -2187,12 +2259,26 @@
       this.bnwFrames = [];
       this.segments = {};
       this.xFrames = [];
+      this.xFrames2 = [];
+      this.xFrames3 = [];
     }
 
     Smoker.prototype.setBNW = function(frames) {
       this.bnwFrames = frames.slice(0);
-      if ((this.faces != null) && this.xFrames.length === 0) {
-        return this.processXFrames();
+      this.segments.xFrames = {
+        frames: this.bnwFrames,
+        loop: true,
+        addition: (function(_this) {
+          return function(ctx, index) {
+            return _this.pulseMouths(ctx, index, 1);
+          };
+        })(this),
+        start: function() {
+          return new soundAnalyzer().playSound();
+        }
+      };
+      if (this.faces != null) {
+        return this.setupZooms();
       }
     };
 
@@ -2211,45 +2297,72 @@
     };
 
     Smoker.prototype.findFaces = function() {
-      window.converter = new Converter(this.smallFrames[0].width);
+      var converter;
+      converter = new Converter(this.smallFrames[0].width);
       return converter.runWorker(this.smallFrames, (function(_this) {
         return function(faces, faceCollection) {
-          _this.faces = faces;
           _this.faceCollection = faceCollection;
+          _this.faces = _this.faceCollection.sortByCertainty(faces);
           _this.faceCollection.applyScale(_this.frames[0].width / _this.smallFrames[0].width);
           _this.faceCollection.fillInBlanks(3);
+          _this.smallFrames = [];
+          _this.frames = [];
+          converter = null;
+          _this.player.recorder = null;
+          _this.player.smallRecorder = null;
           log('got all the faces', _this.faces);
-          if (_this.bnwFrames.length > 0 && _this.xFrames.length === 0) {
-            return _this.processXFrames();
+          if (_this.bnwFrames.length > 0) {
+            return _this.setupZooms();
           }
         };
       })(this));
     };
 
-    Smoker.prototype.processXFrames = function(inProcess, index) {
+    Smoker.prototype.processXFrames = function(inProcess, index, type) {
       var frame;
       inProcess = inProcess || this.bnwFrames.slice(0);
       index = index || 0;
       frame = inProcess.shift();
       this.context.putImageData(frame, 0, 0);
-      this.drawFaces(this.context, index);
-      this.xFrames.push(this.context.getImageData(0, 0, this.canvas.width, this.canvas.height));
+      this.drawFaces(this.context, index, type);
+      if (type === 1) {
+        this.xFrames.push(this.context.getImageData(0, 0, this.canvas.width, this.canvas.height));
+      } else if (type === 2) {
+        this.xFrames2.push(this.context.getImageData(0, 0, this.canvas.width, this.canvas.height));
+      } else {
+        this.xFrames3.push(this.context.getImageData(0, 0, this.canvas.width, this.canvas.height));
+      }
       if (inProcess.length > 0) {
         return setTimeout((function(_this) {
           return function() {
+            log(index);
             index++;
-            return _this.processXFrames(inProcess, index);
+            return _this.processXFrames(inProcess, index, type);
           };
         })(this), 50);
       } else {
-        log('done with processXFrames');
-        this.segments.xFrames = {
-          frames: this.xFrames,
-          addition: this.pulseMouths,
-          preprocess: this.pulseBlack
-        };
-        log('set up zooms');
-        return this.setupZooms();
+        log('done with processXFrames ' + type);
+        if (type === 2) {
+          this.segments.xFrames2 = {
+            frames: this.xFrames2,
+            loop: true,
+            addition: (function(_this) {
+              return function(ctx, index) {
+                return _this.pulseMouths(ctx, index, 2);
+              };
+            })(this)
+          };
+          return this.processXFrames(null, null, 3);
+        } else {
+          return this.segments.xFrames3 = {
+            frames: this.xFrames3,
+            addition: (function(_this) {
+              return function(ctx, index) {
+                return _this.pulseMouths(ctx, index, 3);
+              };
+            })(this)
+          };
+        }
       }
     };
 
@@ -2269,19 +2382,10 @@
             var index;
             log('zoom ready');
             index = 0;
-            while (frames.length !== 260) {
-              frames.push(frames[index]);
-              index++;
-              if (index > frames.length - 1) {
-                index = 0;
-              }
-            }
             _this.segments.firstFace = {
               frames: frames,
-              preprocess: _this.alphaInOut,
-              start: function() {
-                return new soundAnalyzer().playSound();
-              }
+              loop: true,
+              addition: _this.fadeInOut
             };
             return _this.getSecondFace(zoomFaces);
           };
@@ -2296,7 +2400,8 @@
       if ((face.frames == null) || face.frames.length < 7) {
         return;
       }
-      frames = this.bnwFrames.slice(0);
+      log('zoomonface');
+      frames = this.bnwFrames;
       centerFace = face.getAverageFace();
       crop = new Cropper({
         width: this.width,
@@ -2306,7 +2411,9 @@
       return crop.start((function(_this) {
         return function(frames) {
           console.log('done running cropper');
-          return complete(frames);
+          complete(frames);
+          crop = null;
+          return frames = null;
         };
       })(this));
     };
@@ -2314,11 +2421,12 @@
     Smoker.prototype.getSecondFace = function(zoomFaces) {
       return this.zoomOnFace(zoomFaces[1], (function(_this) {
         return function(frames) {
+          log('got second face');
           _this.segments.secondFace = {
             frames: frames,
             addition: _this.fadeInOut
           };
-          return _this.getThirdFace(zoomFaces);
+          return _this.processXFrames(null, null, 2);
         };
       })(this));
     };
@@ -2330,7 +2438,7 @@
             frames: frames,
             preprocess: _this.cbrFilter
           };
-          return _this.getAlphaFace();
+          return _this.processXFrames(null, null, 1);
         };
       })(this));
     };
@@ -2354,14 +2462,22 @@
       };
     };
 
-    Smoker.prototype.drawFaces = function(ctx, index) {
-      var face, _i, _len, _ref, _results;
-      if (this.faces.length > 0) {
-        _ref = this.faces;
+    Smoker.prototype.drawFaces = function(ctx, index, type) {
+      var face, faces, _i, _len, _results;
+      if (type === 1) {
+        faces = this.faces.slice(0, 1);
+      }
+      if (type === 2) {
+        faces = this.faces.slice(0, 3);
+      }
+      if (type === 3) {
+        faces = this.faces;
+      }
+      if (faces.length > 0) {
         _results = [];
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          face = _ref[_i];
-          _results.push(face.drawFace(ctx, index));
+        for (_i = 0, _len = faces.length; _i < _len; _i++) {
+          face = faces[_i];
+          _results.push(face.drawFace(ctx, index, type));
         }
         return _results;
       }
@@ -2389,11 +2505,11 @@
 
     Smoker.prototype.fadeInOut = function(ctx, index) {
       var alpha;
-      if (index < 45) {
-        alpha = 1 - index / 45;
+      if (index < 30) {
+        alpha = 1 - index / 30;
         ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
-      } else if (index > 45) {
-        alpha = index % 45 / 45;
+      } else if (index > 30) {
+        alpha = index % 30 / 30;
         ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')';
       }
       return ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -2418,14 +2534,41 @@
       return frame;
     };
 
-    Smoker.prototype.pulseMouths = function(ctx, index) {
-      var face, _i, _len, _ref, _results;
+    Smoker.prototype.pulseMouths = function(ctx, index, type) {
+      var face, faces, _i, _len, _results;
       if (this.faces.length > 0) {
-        _ref = this.faces;
+        if (type === 1) {
+          face = this.faces[0];
+          faces = [face];
+          if (this.stopIn != null) {
+            type = 4;
+            this.stopIn--;
+            log('stopIn', this.stopIn);
+            if (this.stopIn % 2 === 0) {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+              ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            } else {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+              ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            }
+            if (this.stopIn === 0) {
+              this.stopIn = null;
+              this.player.cPlayer.stop = true;
+            }
+          } else {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+          }
+          face.drawFace(ctx, index, type);
+        } else if (type === 2) {
+          faces = this.faces.slice(0, 3);
+        } else {
+          faces = this.faces;
+        }
         _results = [];
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          face = _ref[_i];
-          _results.push(face.pulse(ctx, index, audioIntensity));
+        for (_i = 0, _len = faces.length; _i < _len; _i++) {
+          face = faces[_i];
+          _results.push(face.pulse(ctx, index, audioIntensity, type));
         }
         return _results;
       }

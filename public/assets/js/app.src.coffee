@@ -279,7 +279,7 @@ $ ->
     createContext: (canvas) ->
       context = canvas.getContext '2d'
 
-class window.soundAnalyzer
+class soundAnalyzer
   constructor: ->
     @all = 0
     @counter = 0
@@ -341,7 +341,7 @@ class window.soundAnalyzer
 
   
 
-class window.Faces
+class Faces
   constructor: (faces, @scale) ->
     if faces.length?
       @allFaces = @flatten faces
@@ -350,6 +350,12 @@ class window.Faces
     @calculateAvgFace()
 
     @facesByFrames = faces
+
+  sortByCertainty: (faces) ->
+    faces.sort (a, b) ->
+      b.certainty - a.certainty
+    faces
+
 
   groupFaces: (frames, faces) ->
     if !frames?
@@ -488,7 +494,7 @@ class window.Faces
     @avgFace = totalFaceArea / @numFaces
 
 
-class window.Face
+class Face
   constructor: () ->
     @frames = []
     @started = null
@@ -520,7 +526,7 @@ class window.Face
     @
 
   probability: ->
-    1 - @emptyFrames() / @frames.length
+    @certainty = 1 - @emptyFrames() / @frames.length
 
   emptyFrames: ->
     numEmpty = 0
@@ -663,7 +669,7 @@ class window.Face
       frame.mouth =
         x: Math.round(frame.x + frame.width/4)
         width: Math.round(frame.width/2)
-        y: Math.round(frame.y + (frame.height/5*2.8))
+        y: Math.round(frame.y + (frame.height/5*3.2))
         height: Math.round(frame.height/2)
       frame.mouth.center =
         x: Math.round frame.mouth.x + frame.mouth.width/2
@@ -680,30 +686,48 @@ class window.Face
   distance: (obj1, obj2) ->
     Math.sqrt(Math.pow((obj1.x - obj2.x), 2) + Math.pow((obj1.y - obj2.y), 2))
 
-  pulse: (ctx, index, amount) ->
+  pulse: (ctx, index, amount, type) ->
     mouth = @frames[index].mouth
 
     ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
     ctx.beginPath()
-    pulseAmount = mouth.width/3 * amount * 1.8
+    pulseAmount = mouth.width/3 * amount * 1.5
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
-    alpha = ((255 - audioIntensity * 255) + 100) / 200
+    # alpha = ((255 - audioIntensity * 255) + 100) / 200
     # log alpha
 
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'black'
+    # log type
+    ctx.globalCompositeOperation = 'source-over'
+    if type is 1
+      ctx.fillStyle = 'white'
+    else if type is 4
+      ctx.fillStyle = 'black'
+    else if type is 2
+      ctx.fillStyle = 'black'
+    else
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = 'black'
+
     ctx.fill()
     ctx.globalCompositeOperation = 'source-over'
 
-  drawFace: (ctx, index) ->
+  drawFace: (ctx, index, type) ->
     face = @frames[index]
 
-    ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
+    if type is 1
+      ctx.fillStyle = 'black'
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+      ctx.fillStyle = 'white'
+    else if type is 4
+      ctx.fillStyle = 'black'
+    else if type is 2
+      ctx.fillStyle = 'black'
+    else if type is 3
+      ctx.globalCompositeOperation = 'destination-out'
+      ctx.fillStyle = 'black'
+      # ctx.fillStyle = 'rgba(5, 0, 0, 1.0)'
     ctx.fillRect(face.eyebar.x, face.eyebar.y, face.eyebar.width, face.eyebar.height)
-    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
-
-    # ctx.fillRect(face.mouth.x, face.mouth.y, face.mouth.width, face.mouth.height)
 
     mouthQuarterX = face.mouth.width/4
     mouthQuarterY = face.mouth.height/4
@@ -719,6 +743,8 @@ class window.Face
     ctx.lineTo(face.mouth.x+mouthQuarterX, face.mouth.y+face.mouth.height)
     ctx.lineTo(face.mouth.x+face.mouth.width, face.mouth.y+mouthQuarterY)
     ctx.fill()
+
+    ctx.globalCompositeOperation = 'source-over'
 
 
   isBegun: ->
@@ -788,7 +814,7 @@ $ ->
     window.processor = new Processor frames, null, fps
     processor.blackandwhite()
 
-class window.CanvasPlayer
+class CanvasPlayer
   constructor: (@canvas, @frames, @fps) ->
     # @options = @options || {}
     # @addSpacer = @options.addSpacer
@@ -819,16 +845,28 @@ class window.CanvasPlayer
       @canvas.height = @player.displayHeight
 
   play: (options) ->
+    if @stop
+      @options.complete()
+      return @stop = !@stop
     if options.onstart?
       options.onstart()
       log 'start'
       options.onstart = null
     @timeout = 1/@fps * 1000
     @options = options || @options
-    if @endFrame > @index
-      @index++
+    if @increment and @endFrame > @index
+        @index++
+    else if !@increment and @index > 0
+      @index--
+    else if @options.loop? and @options.loop
+      log 'decrement'
+      @increment = !@increment
+      if @increment
+        @index++
+      else
+        @index--
     else
-        return @options.complete()
+      return @options.complete()
 
     frame = @frames[@index]
     frame = @options.preprocess(frame, @index) if @options.preprocess?
@@ -844,6 +882,10 @@ class window.CanvasPlayer
       @play(options)
     , @timeout
 
+
+  timestamp: ->
+    if window.performance and window.performance.now then window.performance.now() else new Date().getTime()
+
   pause: ->
     @paused = !@paused
 
@@ -856,7 +898,7 @@ class window.CanvasPlayer
       $(@canvas).remove()
     , 300
 
-class window.Converter
+class Converter
   constructor: (@width, options) ->
     @options = options || {}
     # @convertCanvas = document.createElement('canvas')
@@ -1152,7 +1194,7 @@ class window.Converter
   appendToForm: (index, file) ->
     @formdata.append("upload[" + index + "]", file)
 
-class window.Cropper
+class Cropper
   constructor: (@goalDimensions) ->
     # @spacer = (@goalDimensions.height - @goalDimensions.width * 9/16) / 2
 
@@ -1173,12 +1215,12 @@ class window.Cropper
     @finishedFrames.push @zoomToFit @currentFace, @frameQueue.shift(), false
     if @frameQueue.length > 0
       setTimeout =>
+        log @frameQueue.length
         @start()
-      , 75
+      , 50
     else
+      log 'zoomed on all frames'
       @doneCallback @finishedFrames
-
-
 
   zoomToFit: (face, frame, isolate) ->
     # debugger if isolate
@@ -1203,7 +1245,7 @@ class window.Cropper
     @goalContext.scale 1/scaleFactor, 1/scaleFactor
     frame = @goalContext.getImageData 0, 0, @goalCanvas.width, @goalCanvas.height
 
-    frame = @isolateFace(face, frame) if isolate
+    # frame = @isolateFace(face, frame) if isolate
 
     frame
 
@@ -1381,7 +1423,7 @@ errorCallback = (error) ->
 
 navigator.getUserMedia(constraints, successCallback, errorCallback)
 
-class window.PlayController
+class PlayController
   constructor: ->
     @started =
       yes: true
@@ -1434,18 +1476,30 @@ class window.PlayController
     # log time
     if Math.floor(time) is 2
       @recordWebcam()
-    if Math.floor(time) is 21
-      @playback('raw') unless @started.raw?
-    if Math.floor(time) is 39
-      @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 52
+    # if Math.floor(time) is 21
+    #   @playback('raw') unless @started.raw?
+    if Math.floor(time) is 20
       @playback('xFrames') unless @started.xFrames?
-    # if Math.floor(time) is 49
-    #   @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 61
-      @playback('thirdFace') unless @started.thirdFace?
-    if Math.floor(time) is 69
-      @playback('alphaFace') unless @started.alphaFace?
+    if Math.floor(time) is 28
+      log 'stop player'
+      # @cPlayer.stop = true
+      @smoker.stopIn = 10
+    if Math.floor(time) is 30
+      @playback('firstFace') unless @started.firstFace?
+    if Math.floor(time) is 49
+      log 'stop player'
+      @cPlayer.stop = true
+    if Math.floor(time) is 50
+      @playback('secondFace') unless @started.secondFace?
+    if Math.floor(time) is 73
+      @playback('xFrames2') unless @started.xFrames2?
+    if Math.floor(time) is 85
+      log 'stop player'
+      @cPlayer.stop = true
+    if Math.floor(time) is 86
+      @playback('xFrames3') unless @started.xFrames3?
+    if Math.floor(time) is 90
+      @ctx.putImageData(@smoker.xFrames2[9], 0, 0)
 
   gameTime: (e) ->
     time = @video.currentTime
@@ -1471,8 +1525,9 @@ class window.PlayController
     segment = @smoker.segments[segment]
     log 'playing'
     if segment?
-      window.cPlayer = new CanvasPlayer @canvas, segment.frames, 20 #@smoker.fps
-      cPlayer.play
+      @cPlayer = new CanvasPlayer @canvas, segment.frames, 15 #@smoker.fps
+      @cPlayer.play
+        loop:       segment.loop
         preprocess: segment.preprocess
         postprocess: segment.postprocess
         onstart: segment.start
@@ -1480,25 +1535,22 @@ class window.PlayController
         complete: =>
           @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
           log 'done playing'
+          segment.complete() if segment.complete?
     else
       log 'segment was not finished'
 
 
-    # @ctx.putImageData
-    # @ctx.fillStyle = "black"
-    # @ctx.fillRect(10, 10, 300, 200)
-
   recordWebcam: ->
-    secs = 3
+    secs = 2
     unless @recorder.started
       log 'start recording'
-      @smoker = new Smoker(@recordCanvas, @recordCtx)
+      @smoker = new Smoker(@recordCanvas, @recordCtx, @)
 
       @recorder.record secs, 30,
         complete: =>
           log 'done recording'
           @smoker.setFrames @recorder.capturedFrames.slice(0), @recorder.fps
-          @startProcessing @recorder.capturedFrames.slice(0), @recorder.fps
+          @startProcessing @recorder.capturedFrames, @recorder.fps
           @recordingComplete = true
 
     unless @smallRecorder.started
@@ -1508,17 +1560,20 @@ class window.PlayController
           @smoker.findFaces()
           @recordingComplete = true
           log 'now find faces'
+          @smallRecorder = null
 
   startProcessing: (frames, fps) ->
     frames = frames.slice(0)
-    window.processor = new Processor frames, null, fps
+    @recorder.capturedFrames = null
+    processor = new Processor frames, null, fps
     faces = processor.
     bnwFrames = processor.blackandwhite
       complete: (bnwFrames) =>
         @smoker.setBNW(bnwFrames)
+        bnwFrames = null
 
   findFaces: ->
-    window.converter = new Converter @recorder.canvas,
+    converter = new Converter @recorder.canvas,
                         @recorder.capturedFrames,
                         @recorder.fps,
                         null,
@@ -1600,7 +1655,7 @@ window.process =
     frame.data = idata
     frame
 
-class window.Processor
+class Processor
   constructor: (@frames, @faces, @options) ->
     @newFrames = []
     @playFrames = []
@@ -1781,7 +1836,7 @@ class window.Processor
     #   src: '/assets/videos/ocean.mp4'
     #   aspect: 16/9
 
-class window.Recorder
+class Recorder
   constructor: (@canvas) ->
     @capturedFrames = []
     @context = @canvas.getContext('2d')
@@ -1818,19 +1873,32 @@ class window.Recorder
     else
       @options.complete() if @options.complete
 
-class window.Smoker
-  constructor: (@canvas, @context) ->
+class Smoker
+  constructor: (@canvas, @context, @player) ->
     @frames = []
     @smallFrames = []
     @bnwFrames = []
     @segments = {}
     @xFrames = []
+    @xFrames2 = []
+    @xFrames3 = []
 
 
   setBNW: (frames) ->
     @bnwFrames = frames.slice(0)
-    if @faces? and @xFrames.length is 0
-      @processXFrames()
+    @segments.xFrames =
+      frames: @bnwFrames
+      loop: true
+      addition: (ctx, index) =>
+        @pulseMouths(ctx, index, 1)
+      start: ->
+        new soundAnalyzer().playSound()
+      # postprocess: @pulseBlack
+      # preprocess: @pulseBlack
+    if @faces? #and @xFrames.length is 0
+      # log 'bnw setup zooms'
+      @setupZooms()
+      # @processXFrames(null, null, 1)
 
   setFrames: (frames, fps) ->
     @frames = frames.slice(0)
@@ -1845,15 +1913,22 @@ class window.Smoker
     @smallFrames = frames.slice(0)
 
   findFaces: ->
-    window.converter = new Converter(@smallFrames[0].width)
+    converter = new Converter(@smallFrames[0].width)
     converter.runWorker(@smallFrames, (faces, faceCollection) =>
-      @faces = faces
       @faceCollection = faceCollection
+      @faces = @faceCollection.sortByCertainty(faces)
       @faceCollection.applyScale(@frames[0].width/@smallFrames[0].width)
       @faceCollection.fillInBlanks(3)
+      @smallFrames = []
+      @frames = []
+      converter = null
+      @player.recorder = null
+      @player.smallRecorder = null
       log 'got all the faces', @faces
-      if @bnwFrames.length > 0 and @xFrames.length is 0
-        @processXFrames()
+      if @bnwFrames.length > 0 #and @xFrames.length is 0
+        # @processXFrames(null, null, 1)
+        # log 'findFaces setup zooms'
+        @setupZooms()
       # @segments.rawRects =
       #   frames: @frames
       #   addition: (ctx, index) =>
@@ -1861,29 +1936,56 @@ class window.Smoker
     )
 
 
-  processXFrames: (inProcess, index) ->
+  processXFrames: (inProcess, index, type) ->
     inProcess = inProcess or @bnwFrames.slice(0)
     index = index or 0
     frame = inProcess.shift()
     @context.putImageData(frame, 0, 0)
-    @drawFaces @context, index
-    @xFrames.push @context.getImageData 0, 0, @canvas.width, @canvas.height
+    @drawFaces @context, index, type
+    if type is 1
+      @xFrames.push @context.getImageData 0, 0, @canvas.width, @canvas.height
+    else if type is 2
+      @xFrames2.push @context.getImageData 0, 0, @canvas.width, @canvas.height
+    else
+      @xFrames3.push @context.getImageData 0, 0, @canvas.width, @canvas.height
 
     if inProcess.length > 0
       setTimeout =>
+        log index
         index++
-        @processXFrames(inProcess, index)
+        @processXFrames(inProcess, index, type)
       , 50
     else
-      log 'done with processXFrames'
-      @segments.xFrames =
-        frames: @xFrames
-        addition: @pulseMouths
-        # postprocess: @pulseBlack
-        preprocess: @pulseBlack
+      log 'done with processXFrames ' + type
+      # if type is 1
+      #   @segments.xFrames =
+      #     frames: @xFrames
+      #     loop: true
+      #     addition: (ctx, index) =>
+      #       @pulseMouths(ctx, index, 1)
+      #     # postprocess: @pulseBlack
+      #     # preprocess: @pulseBlack
+      #   # @setupZooms()
+      #   @processXFrames(null, null, 2)
 
-      log 'set up zooms'
-      @setupZooms()
+      # else if type is 2
+      if type is 2
+        @segments.xFrames2 =
+          frames: @xFrames2
+          loop: true
+          addition: (ctx, index) =>
+            @pulseMouths(ctx, index, 2)
+          # postprocess: @pulseBlack
+          # preprocess: @pulseBlack
+        @processXFrames(null, null, 3)
+        # @setupZooms()
+      else
+        @segments.xFrames3 =
+          frames: @xFrames3
+          addition: (ctx, index) =>
+            @pulseMouths(ctx, index, 3)
+          # postprocess: @pulseBlack
+          # preprocess: @pulseBlack
 
 
   setupZooms: ->
@@ -1898,18 +2000,19 @@ class window.Smoker
       @zoomOnFace(zoomFaces[0], (frames) =>
         log 'zoom ready'
         index = 0
-        until frames.length is 260
-          frames.push frames[index]
-          index++
-          if index > frames.length - 1
-            index = 0
+        # until frames.length is 260
+        #   frames.push frames[index]
+        #   index++
+        #   if index > frames.length - 1
+        #     index = 0
         @segments.firstFace =
           frames: frames
+          loop: true
           # addition: @pulseMouths
-          preprocess: @alphaInOut
-          # addition: @fadeInOut
-          start: ->
-            new soundAnalyzer().playSound()
+          # preprocess: @alphaInOut
+          addition: @fadeInOut
+          # complete: =>
+          #   @segments.firstFace = null
         @getSecondFace(zoomFaces)
       )
     else
@@ -1917,8 +2020,9 @@ class window.Smoker
 
   zoomOnFace: (face, complete) ->
     return if !face.frames? or face.frames.length < 7
+    log 'zoomonface'
 
-    frames = @bnwFrames.slice(0)
+    frames = @bnwFrames
 
     # centerFace = face.frames[6]
     centerFace = face.getAverageFace()
@@ -1930,13 +2034,23 @@ class window.Smoker
     crop.start (frames) =>
       console.log 'done running cropper'
       complete(frames)
+      crop = null
+      frames = null
 
   getSecondFace: (zoomFaces) ->
     @zoomOnFace(zoomFaces[1], (frames) =>
+      log 'got second face'
       @segments.secondFace =
         frames: frames
         addition: @fadeInOut
-      @getThirdFace(zoomFaces)
+        # complete: =>
+        #   @segments.secondFace = null
+        #   setTimeout =>
+        #     log 'second face done, now process xFrames3'
+        #     @processXFrames(null, null, 3)
+        #   , 500
+      # @getThirdFace(zoomFaces)
+      @processXFrames(null, null, 2)
     )
 
   getThirdFace: (zoomFaces) ->
@@ -1946,7 +2060,8 @@ class window.Smoker
         # addition: @fadeInOut
         preprocess: @cbrFilter
 
-      @getAlphaFace()
+      @processXFrames(null, null, 1)
+      # @getAlphaFace()
     )
 
   getAlphaFace: ->
@@ -1968,17 +2083,20 @@ class window.Smoker
       # preprocess: @cbrFilter
       # addition: @drawAlphaFace
 
-  drawFaces: (ctx, index) ->
-    if @faces.length > 0
-      for face in @faces
-        face.drawFace ctx, index
+  drawFaces: (ctx, index, type) ->
+    if type is 1
+      faces = @faces.slice(0, 1)
+    if type is 2
+      faces = @faces.slice(0, 3)
+    if type is 3
+      faces = @faces
+    if faces.length > 0
+      for face in faces
+        face.drawFace ctx, index, type
 
   pulseBlack: (frame) =>
     idata = frame.data
     trans = Math.floor (255 - audioIntensity * 255) + 100
-    # trans = 150 - trans
-    # trans = Math.floor trans/60 * 255
-    # log trans
 
     for pixel, index in idata by 4
       r = idata[index]
@@ -2007,11 +2125,11 @@ class window.Smoker
 
   fadeInOut: (ctx, index) ->
     # totalFrames = totalFrames or 90
-    if index < 45
-      alpha = 1 - index/45
+    if index < 30
+      alpha = 1 - index/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
-    else if index > 45
-      alpha = index%45/45
+    else if index > 30
+      alpha = index%30/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
 
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
@@ -2033,10 +2151,34 @@ class window.Smoker
     frame.data = idata
     frame
 
-  pulseMouths: (ctx, index) =>
+  pulseMouths: (ctx, index, type) =>
     if @faces.length > 0
-      for face in @faces
-        face.pulse ctx, index, audioIntensity
+      if type is 1
+        face = @faces[0]
+        faces = [face]
+        if @stopIn?
+          type = 4
+          @stopIn--
+          log 'stopIn', @stopIn
+          if @stopIn % 2 is 0
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+          else
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
+            ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+          if @stopIn is 0
+            @stopIn = null
+            @player.cPlayer.stop = true
+        else
+          ctx.fillStyle = 'black'
+          ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+        face.drawFace(ctx, index, type)
+      else if type is 2
+        faces = @faces.slice(0, 3)
+      else
+        faces = @faces
+      for face in faces
+        face.pulse ctx, index, audioIntensity, type
 
   drawAlphaFace: (ctx, index) =>
     frame =

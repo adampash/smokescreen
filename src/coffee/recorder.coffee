@@ -1,4 +1,4 @@
-class window.Recorder
+class Recorder
   constructor: (@canvas) ->
     @capturedFrames = []
     @context = @canvas.getContext('2d')

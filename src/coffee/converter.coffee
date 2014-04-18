@@ -1,4 +1,4 @@
-class window.Converter
+class Converter
   constructor: (@width, options) ->
     @options = options || {}
     # @convertCanvas = document.createElement('canvas')
