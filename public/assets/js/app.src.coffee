@@ -319,7 +319,6 @@ class window.soundAnalyzer
     $intensity = $("#intensity")
 
   analyze: =>
-    log 'analyze'
     @analyzer.getByteFrequencyData(@frequencyData)
     magnitude = 0
     for frequency in @frequencyData

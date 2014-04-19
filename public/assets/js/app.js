@@ -406,7 +406,6 @@
 
     soundAnalyzer.prototype.analyze = function() {
       var frequency, magnitude, _i, _len, _ref;
-      log('analyze');
       this.analyzer.getByteFrequencyData(this.frequencyData);
       magnitude = 0;
       _ref = this.frequencyData;
