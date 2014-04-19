@@ -4,6 +4,7 @@ class CanvasPlayer
     # @addSpacer = @options.addSpacer
     # @progress = @options.progress
     @paused = false
+    @stop = false
     @context = @canvas.getContext('2d')
     @index = 0
     @fps = @fps || 30

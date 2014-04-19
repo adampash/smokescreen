@@ -279,8 +279,8 @@ $ ->
     createContext: (canvas) ->
       context = canvas.getContext '2d'
 
-class soundAnalyzer
-  constructor: ->
+class window.soundAnalyzer
+  constructor: (@player) ->
     @all = 0
     @counter = 0
     @low = 1000
@@ -288,7 +288,8 @@ class soundAnalyzer
   playSound: (soundURL) ->
     # http://stackoverflow.com/questions/10105063/how-to-play-a-notification-sound-on-websites 
     @shouldAnalyze = true
-    soundURL = soundURL or "/assets/audio/awobmolg.m4a"
+    # soundURL = soundURL or "/assets/audio/awobmolg.m4a"
+    soundURL = soundURL or "/assets/audio/AWOBMOLGQUIET.mp3"
     console.log('playing sound: ' + soundURL)
     $('body').append '<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>'
 
@@ -329,17 +330,17 @@ class soundAnalyzer
 
     @high = Math.max @high, magnitude
     @low = Math.min @low, magnitude
-    @all += magnitude
-    @counter++
+    # @all += magnitude
+    # @counter++
 
-    window.audioIntensity = (magnitude/@high)
-    # console.log audioIntensity
-    # opacity = 0.8 - (magnitude/frequencyData.length)/40
-    # $intensity.css("opacity": opacity)
+    magnitude = (magnitude - 2000) / (@high-2000)
+    window.audioIntensity = Math.max Math.min(magnitude, 1), 0
 
-    setTimeout(@analyze, 33) if @shouldAnalyze
+    # if @player? and @player.smoker.type?
+    #   # log 'pulse it'
+    #   @player.smoker.pulseMouths @player.ctx, @player.cPlayer.index, @player.smoker.type, audioIntensity
 
-  
+    setTimeout(@analyze, 10) if @shouldAnalyze
 
 class Faces
   constructor: (faces, @scale) ->
@@ -669,7 +670,7 @@ class Face
       frame.mouth =
         x: Math.round(frame.x + frame.width/4)
         width: Math.round(frame.width/2)
-        y: Math.round(frame.y + (frame.height/5*3.2))
+        y: Math.round(frame.y + (frame.height/5*3.1))
         height: Math.round(frame.height/2)
       frame.mouth.center =
         x: Math.round frame.mouth.x + frame.mouth.width/2
@@ -691,7 +692,15 @@ class Face
 
     ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
     ctx.beginPath()
-    pulseAmount = mouth.width/3 * amount * 1.5
+    minWidth = mouth.width/3.5
+    maxWidth = mouth.width/2
+    # pulseAmount = Math.max(minWidth * amount * 1.5, minWidth)
+    if amount < 0.3
+      pulseAmount = 0
+    else
+      amount = (amount - 0.3) / (1.0 - 0.3)
+      pulseAmount = minWidth + maxWidth * amount
+    pulseAmount = Math.min(maxWidth * 0.9, pulseAmount)
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
     # alpha = ((255 - audioIntensity * 255) + 100) / 200
@@ -820,6 +829,7 @@ class CanvasPlayer
     # @addSpacer = @options.addSpacer
     # @progress = @options.progress
     @paused = false
+    @stop = false
     @context = @canvas.getContext('2d')
     @index = 0
     @fps = @fps || 30
@@ -1430,6 +1440,7 @@ class PlayController
     @setDimensions()
     @recordCanvas = @createCanvas(@displayWidth)
     @recordCtx = @createContext @recordCanvas
+    @activeFaces = []
 
     @smallRecord = @createCanvas(720)
     # @smallRecord = @createCanvas(960)
@@ -1451,14 +1462,26 @@ class PlayController
   init: ->
     $(window).on 'click', =>
       $('h1').remove()
-      @video.play()
-      @webcam = $('#webcam')[0]
-      @webcam.src = webcam.src
-      @drawWebcam()
+      @startPlayer()
+
+  startPlayer: ->
+    # @video.currentTime = 121
+    @video.play()
+    @webcam = $('#webcam')[0]
+    @webcam.src = webcam.src
+    @drawWebcam()
 
     @video.addEventListener 'timeupdate', (e) =>
       @checkTime(e)
       # @gameTime(e)
+
+  replay: ->
+    @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
+    @started =
+      yes: true
+    @video.currentTime = 0
+    @video.play()
+
 
   drawWebcam: =>
     @recordCtx.drawImage(@webcam,0,0, @recordCanvas.width, @recordCanvas.height)
@@ -1472,51 +1495,65 @@ class PlayController
 
 
   checkTime: (e) ->
-    time = @video.currentTime
-    # log time
-    if Math.floor(time) is 2
+    time = Math.floor @video.currentTime
+    if (time) is 2
       @recordWebcam()
-    # if Math.floor(time) is 21
+    # if (time) is 21
     #   @playback('raw') unless @started.raw?
-    if Math.floor(time) is 20
+    if (time) is 12
       @playback('xFrames') unless @started.xFrames?
-    if Math.floor(time) is 28
+    if (time) is 28
       log 'stop player'
       # @cPlayer.stop = true
-      @smoker.stopIn = 10
-    if Math.floor(time) is 30
+      @smoker.stopIn = 20
+    if (time) is 32
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 49
-      log 'stop player'
-      @cPlayer.stop = true
-    if Math.floor(time) is 50
+    # if (time) is 49
+    #   log 'stop player'
+    #   @cPlayer.stop = true
+    if (time) is 37
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 73
+    if (time) is 46
       @playback('xFrames2') unless @started.xFrames2?
-    if Math.floor(time) is 85
+    if (time) is 52
       log 'stop player'
       @cPlayer.stop = true
-    if Math.floor(time) is 86
+    if (time) is 54
       @playback('xFrames3') unless @started.xFrames3?
-    if Math.floor(time) is 90
-      @ctx.putImageData(@smoker.xFrames2[9], 0, 0)
+    if (time) is 59
+      log 'stop player'
+      @cPlayer.stop = true
+    if (time) is 61
+      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
 
   gameTime: (e) ->
-    time = @video.currentTime
-    if Math.floor(time) is 127
+    time = Math.floor @video.currentTime
+    # log time
+
+    if (time) is 127
       @recordWebcam()
-    # if Math.floor(time) is 21
+    # if (time) is 21
     #   @playback('raw') unless @started.raw?
-    if Math.floor(time) is 180
+    if (time) is 142
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 187
-      @playback('xFrames') unless @started.xFrames?
-    if Math.floor(time) is 197
+    if (time) is 149
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 204
-      @playback('thirdFace') unless @started.thirdFace?
-    if Math.floor(time) is 210
-      @playback('alphaFace') unless @started.thirdFace?
+    if (time) is 155
+      @playback('xFrames') unless @started.xFrames?
+    if (time) is 168
+      log 'stop player 1'
+      @smoker.stopIn = 20
+    if (time) is 174
+      @playback('xFrames2') unless @started.xFrames2?
+    if (time) is 187
+      @cPlayer.stop = true
+    if (time) is 192
+      @playback('xFrames3') unless @started.xFrames3?
+    if (time) is 197
+      log 'stop player'
+      @cPlayer.stop = true
+    if (time) is 200
+      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
 
   playback: (segment) ->
     # debugger if segment is 'alphaFace'
@@ -1541,6 +1578,7 @@ class PlayController
 
 
   recordWebcam: ->
+    return if @smoker?
     secs = 2
     unless @recorder.started
       log 'start recording'
@@ -1891,10 +1929,8 @@ class Smoker
       loop: true
       addition: (ctx, index) =>
         @pulseMouths(ctx, index, 1)
-      start: ->
-        new soundAnalyzer().playSound()
-      # postprocess: @pulseBlack
-      # preprocess: @pulseBlack
+      start: =>
+        new soundAnalyzer(@player).playSound()
     if @faces? #and @xFrames.length is 0
       # log 'bnw setup zooms'
       @setupZooms()
@@ -1982,6 +2018,7 @@ class Smoker
       else
         @segments.xFrames3 =
           frames: @xFrames3
+          loop: true
           addition: (ctx, index) =>
             @pulseMouths(ctx, index, 3)
           # postprocess: @pulseBlack
@@ -2007,7 +2044,7 @@ class Smoker
         #     index = 0
         @segments.firstFace =
           frames: frames
-          loop: true
+          # loop: true
           # addition: @pulseMouths
           # preprocess: @alphaInOut
           addition: @fadeInOut
@@ -2085,13 +2122,13 @@ class Smoker
 
   drawFaces: (ctx, index, type) ->
     if type is 1
-      faces = @faces.slice(0, 1)
+      @activeFaces = @faces.slice(0, 1)
     if type is 2
-      faces = @faces.slice(0, 3)
+      @activeFaces = @faces.slice(0, 3)
     if type is 3
-      faces = @faces
-    if faces.length > 0
-      for face in faces
+      @activeFaces = @faces
+    if @activeFaces.length > 0
+      for face in @activeFaces
         face.drawFace ctx, index, type
 
   pulseBlack: (frame) =>
@@ -2152,12 +2189,14 @@ class Smoker
     frame
 
   pulseMouths: (ctx, index, type) =>
+    @type = type
     if @faces.length > 0
       if type is 1
         face = @faces[0]
         faces = [face]
         if @stopIn?
           type = 4
+          @type = type
           @stopIn--
           log 'stopIn', @stopIn
           if @stopIn % 2 is 0
@@ -2166,7 +2205,8 @@ class Smoker
           else
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-          if @stopIn is 0
+          if @stopIn < 1
+            log 'stop for real ' + type
             @stopIn = null
             @player.cPlayer.stop = true
         else
@@ -2175,6 +2215,12 @@ class Smoker
         face.drawFace(ctx, index, type)
       else if type is 2
         faces = @faces.slice(0, 3)
+        # if @stopIn?
+        #   @stopIn--
+        #   if @stopIn < 1
+        #     log 'stop for real ' + type
+        #     @stopIn = null
+        #     @player.cPlayer.stop = true
       else
         faces = @faces
       for face in faces

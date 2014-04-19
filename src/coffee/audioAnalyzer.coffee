@@ -1,5 +1,5 @@
-class soundAnalyzer
-  constructor: ->
+class window.soundAnalyzer
+  constructor: (@player) ->
     @all = 0
     @counter = 0
     @low = 1000
@@ -7,7 +7,8 @@ class soundAnalyzer
   playSound: (soundURL) ->
     # http://stackoverflow.com/questions/10105063/how-to-play-a-notification-sound-on-websites 
     @shouldAnalyze = true
-    soundURL = soundURL or "/assets/audio/awobmolg.m4a"
+    # soundURL = soundURL or "/assets/audio/awobmolg.m4a"
+    soundURL = soundURL or "/assets/audio/AWOBMOLGQUIET.mp3"
     console.log('playing sound: ' + soundURL)
     $('body').append '<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>'
 
@@ -48,14 +49,14 @@ class soundAnalyzer
 
     @high = Math.max @high, magnitude
     @low = Math.min @low, magnitude
-    @all += magnitude
-    @counter++
+    # @all += magnitude
+    # @counter++
 
-    window.audioIntensity = (magnitude/@high)
-    # console.log audioIntensity
-    # opacity = 0.8 - (magnitude/frequencyData.length)/40
-    # $intensity.css("opacity": opacity)
+    magnitude = (magnitude - 2000) / (@high-2000)
+    window.audioIntensity = Math.max Math.min(magnitude, 1), 0
 
-    setTimeout(@analyze, 33) if @shouldAnalyze
+    # if @player? and @player.smoker.type?
+    #   # log 'pulse it'
+    #   @player.smoker.pulseMouths @player.ctx, @player.cPlayer.index, @player.smoker.type, audioIntensity
 
-  
+    setTimeout(@analyze, 10) if @shouldAnalyze

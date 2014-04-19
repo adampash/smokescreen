@@ -326,7 +326,7 @@ class Face
       frame.mouth =
         x: Math.round(frame.x + frame.width/4)
         width: Math.round(frame.width/2)
-        y: Math.round(frame.y + (frame.height/5*3.2))
+        y: Math.round(frame.y + (frame.height/5*3.1))
         height: Math.round(frame.height/2)
       frame.mouth.center =
         x: Math.round frame.mouth.x + frame.mouth.width/2
@@ -348,7 +348,15 @@ class Face
 
     ctx.fillStyle = 'rgba(255, 255, 255, 1.0)'
     ctx.beginPath()
-    pulseAmount = mouth.width/3 * amount * 1.5
+    minWidth = mouth.width/3.5
+    maxWidth = mouth.width/2
+    # pulseAmount = Math.max(minWidth * amount * 1.5, minWidth)
+    if amount < 0.3
+      pulseAmount = 0
+    else
+      amount = (amount - 0.3) / (1.0 - 0.3)
+      pulseAmount = minWidth + maxWidth * amount
+    pulseAmount = Math.min(maxWidth * 0.9, pulseAmount)
     ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false)
 
     # alpha = ((255 - audioIntensity * 255) + 100) / 200

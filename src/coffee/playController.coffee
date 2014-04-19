@@ -5,6 +5,7 @@ class PlayController
     @setDimensions()
     @recordCanvas = @createCanvas(@displayWidth)
     @recordCtx = @createContext @recordCanvas
+    @activeFaces = []
 
     @smallRecord = @createCanvas(720)
     # @smallRecord = @createCanvas(960)
@@ -26,14 +27,26 @@ class PlayController
   init: ->
     $(window).on 'click', =>
       $('h1').remove()
-      @video.play()
-      @webcam = $('#webcam')[0]
-      @webcam.src = webcam.src
-      @drawWebcam()
+      @startPlayer()
+
+  startPlayer: ->
+    # @video.currentTime = 121
+    @video.play()
+    @webcam = $('#webcam')[0]
+    @webcam.src = webcam.src
+    @drawWebcam()
 
     @video.addEventListener 'timeupdate', (e) =>
       @checkTime(e)
       # @gameTime(e)
+
+  replay: ->
+    @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
+    @started =
+      yes: true
+    @video.currentTime = 0
+    @video.play()
+
 
   drawWebcam: =>
     @recordCtx.drawImage(@webcam,0,0, @recordCanvas.width, @recordCanvas.height)
@@ -47,51 +60,65 @@ class PlayController
 
 
   checkTime: (e) ->
-    time = @video.currentTime
-    # log time
-    if Math.floor(time) is 2
+    time = Math.floor @video.currentTime
+    if (time) is 2
       @recordWebcam()
-    # if Math.floor(time) is 21
+    # if (time) is 21
     #   @playback('raw') unless @started.raw?
-    if Math.floor(time) is 20
+    if (time) is 12
       @playback('xFrames') unless @started.xFrames?
-    if Math.floor(time) is 28
+    if (time) is 28
       log 'stop player'
       # @cPlayer.stop = true
-      @smoker.stopIn = 10
-    if Math.floor(time) is 30
+      @smoker.stopIn = 20
+    if (time) is 32
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 49
-      log 'stop player'
-      @cPlayer.stop = true
-    if Math.floor(time) is 50
+    # if (time) is 49
+    #   log 'stop player'
+    #   @cPlayer.stop = true
+    if (time) is 37
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 73
+    if (time) is 46
       @playback('xFrames2') unless @started.xFrames2?
-    if Math.floor(time) is 85
+    if (time) is 52
       log 'stop player'
       @cPlayer.stop = true
-    if Math.floor(time) is 86
+    if (time) is 54
       @playback('xFrames3') unless @started.xFrames3?
-    if Math.floor(time) is 90
-      @ctx.putImageData(@smoker.xFrames2[9], 0, 0)
+    if (time) is 59
+      log 'stop player'
+      @cPlayer.stop = true
+    if (time) is 61
+      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
 
   gameTime: (e) ->
-    time = @video.currentTime
-    if Math.floor(time) is 127
+    time = Math.floor @video.currentTime
+    # log time
+
+    if (time) is 127
       @recordWebcam()
-    # if Math.floor(time) is 21
+    # if (time) is 21
     #   @playback('raw') unless @started.raw?
-    if Math.floor(time) is 180
+    if (time) is 142
       @playback('firstFace') unless @started.firstFace?
-    if Math.floor(time) is 187
-      @playback('xFrames') unless @started.xFrames?
-    if Math.floor(time) is 197
+    if (time) is 149
       @playback('secondFace') unless @started.secondFace?
-    if Math.floor(time) is 204
-      @playback('thirdFace') unless @started.thirdFace?
-    if Math.floor(time) is 210
-      @playback('alphaFace') unless @started.thirdFace?
+    if (time) is 155
+      @playback('xFrames') unless @started.xFrames?
+    if (time) is 168
+      log 'stop player 1'
+      @smoker.stopIn = 20
+    if (time) is 174
+      @playback('xFrames2') unless @started.xFrames2?
+    if (time) is 187
+      @cPlayer.stop = true
+    if (time) is 192
+      @playback('xFrames3') unless @started.xFrames3?
+    if (time) is 197
+      log 'stop player'
+      @cPlayer.stop = true
+    if (time) is 200
+      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
 
   playback: (segment) ->
     # debugger if segment is 'alphaFace'
@@ -116,6 +143,7 @@ class PlayController
 
 
   recordWebcam: ->
+    return if @smoker?
     secs = 2
     unless @recorder.started
       log 'start recording'

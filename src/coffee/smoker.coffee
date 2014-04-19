@@ -16,10 +16,8 @@ class Smoker
       loop: true
       addition: (ctx, index) =>
         @pulseMouths(ctx, index, 1)
-      start: ->
-        new soundAnalyzer().playSound()
-      # postprocess: @pulseBlack
-      # preprocess: @pulseBlack
+      start: =>
+        new soundAnalyzer(@player).playSound()
     if @faces? #and @xFrames.length is 0
       # log 'bnw setup zooms'
       @setupZooms()
@@ -107,6 +105,7 @@ class Smoker
       else
         @segments.xFrames3 =
           frames: @xFrames3
+          loop: true
           addition: (ctx, index) =>
             @pulseMouths(ctx, index, 3)
           # postprocess: @pulseBlack
@@ -132,7 +131,7 @@ class Smoker
         #     index = 0
         @segments.firstFace =
           frames: frames
-          loop: true
+          # loop: true
           # addition: @pulseMouths
           # preprocess: @alphaInOut
           addition: @fadeInOut
@@ -210,13 +209,13 @@ class Smoker
 
   drawFaces: (ctx, index, type) ->
     if type is 1
-      faces = @faces.slice(0, 1)
+      @activeFaces = @faces.slice(0, 1)
     if type is 2
-      faces = @faces.slice(0, 3)
+      @activeFaces = @faces.slice(0, 3)
     if type is 3
-      faces = @faces
-    if faces.length > 0
-      for face in faces
+      @activeFaces = @faces
+    if @activeFaces.length > 0
+      for face in @activeFaces
         face.drawFace ctx, index, type
 
   pulseBlack: (frame) =>
@@ -277,12 +276,14 @@ class Smoker
     frame
 
   pulseMouths: (ctx, index, type) =>
+    @type = type
     if @faces.length > 0
       if type is 1
         face = @faces[0]
         faces = [face]
         if @stopIn?
           type = 4
+          @type = type
           @stopIn--
           log 'stopIn', @stopIn
           if @stopIn % 2 is 0
@@ -291,7 +292,8 @@ class Smoker
           else
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'
             ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-          if @stopIn is 0
+          if @stopIn < 1
+            log 'stop for real ' + type
             @stopIn = null
             @player.cPlayer.stop = true
         else
@@ -300,6 +302,12 @@ class Smoker
         face.drawFace(ctx, index, type)
       else if type is 2
         faces = @faces.slice(0, 3)
+        # if @stopIn?
+        #   @stopIn--
+        #   if @stopIn < 1
+        #     log 'stop for real ' + type
+        #     @stopIn = null
+        #     @player.cPlayer.stop = true
       else
         faces = @faces
       for face in faces

@@ -1,5 +1,5 @@
 (function() {
-  var CanvasPlayer, Converter, Cropper, Face, Faces, PlayController, Processor, Recorder, Smoker, constraints, errorCallback, soundAnalyzer, successCallback,
+  var CanvasPlayer, Converter, Cropper, Face, Faces, PlayController, Processor, Recorder, Smoker, constraints, errorCallback, successCallback,
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
@@ -361,8 +361,9 @@
     })();
   });
 
-  soundAnalyzer = (function() {
-    function soundAnalyzer() {
+  window.soundAnalyzer = (function() {
+    function soundAnalyzer(player) {
+      this.player = player;
       this.analyze = __bind(this.analyze, this);
       this.all = 0;
       this.counter = 0;
@@ -373,7 +374,7 @@
     soundAnalyzer.prototype.playSound = function(soundURL) {
       var $intensity, audioContext;
       this.shouldAnalyze = true;
-      soundURL = soundURL || "/assets/audio/awobmolg.m4a";
+      soundURL = soundURL || "/assets/audio/AWOBMOLGQUIET.mp3";
       console.log('playing sound: ' + soundURL);
       $('body').append('<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>');
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -412,11 +413,10 @@
       }
       this.high = Math.max(this.high, magnitude);
       this.low = Math.min(this.low, magnitude);
-      this.all += magnitude;
-      this.counter++;
-      window.audioIntensity = magnitude / this.high;
+      magnitude = (magnitude - 2000) / (this.high - 2000);
+      window.audioIntensity = Math.max(Math.min(magnitude, 1), 0);
       if (this.shouldAnalyze) {
-        return setTimeout(this.analyze, 33);
+        return setTimeout(this.analyze, 10);
       }
     };
 
@@ -863,7 +863,7 @@
         frame.mouth = {
           x: Math.round(frame.x + frame.width / 4),
           width: Math.round(frame.width / 2),
-          y: Math.round(frame.y + (frame.height / 5 * 3.2)),
+          y: Math.round(frame.y + (frame.height / 5 * 3.1)),
           height: Math.round(frame.height / 2)
         };
         frame.mouth.center = {
@@ -890,11 +890,19 @@
     };
 
     Face.prototype.pulse = function(ctx, index, amount, type) {
-      var mouth, pulseAmount;
+      var maxWidth, minWidth, mouth, pulseAmount;
       mouth = this.frames[index].mouth;
       ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
       ctx.beginPath();
-      pulseAmount = mouth.width / 3 * amount * 1.5;
+      minWidth = mouth.width / 3.5;
+      maxWidth = mouth.width / 2;
+      if (amount < 0.3) {
+        pulseAmount = 0;
+      } else {
+        amount = (amount - 0.3) / (1.0 - 0.3);
+        pulseAmount = minWidth + maxWidth * amount;
+      }
+      pulseAmount = Math.min(maxWidth * 0.9, pulseAmount);
       ctx.arc(mouth.center.x, mouth.center.y, pulseAmount, 0, 2 * Math.PI, false);
       ctx.globalCompositeOperation = 'source-over';
       if (type === 1) {
@@ -1036,6 +1044,7 @@
       this.frames = frames;
       this.fps = fps;
       this.paused = false;
+      this.stop = false;
       this.context = this.canvas.getContext('2d');
       this.index = 0;
       this.fps = this.fps || 30;
@@ -1699,6 +1708,7 @@
       this.setDimensions();
       this.recordCanvas = this.createCanvas(this.displayWidth);
       this.recordCtx = this.createContext(this.recordCanvas);
+      this.activeFaces = [];
       this.smallRecord = this.createCanvas(720);
       this.smallCtx = this.createContext(this.smallRecord);
       this.recorder = new Recorder(this.recordCanvas);
@@ -1711,20 +1721,33 @@
     }
 
     PlayController.prototype.init = function() {
-      $(window).on('click', (function(_this) {
+      return $(window).on('click', (function(_this) {
         return function() {
           $('h1').remove();
-          _this.video.play();
-          _this.webcam = $('#webcam')[0];
-          _this.webcam.src = webcam.src;
-          return _this.drawWebcam();
+          return _this.startPlayer();
         };
       })(this));
+    };
+
+    PlayController.prototype.startPlayer = function() {
+      this.video.play();
+      this.webcam = $('#webcam')[0];
+      this.webcam.src = webcam.src;
+      this.drawWebcam();
       return this.video.addEventListener('timeupdate', (function(_this) {
         return function(e) {
           return _this.checkTime(e);
         };
       })(this));
+    };
+
+    PlayController.prototype.replay = function() {
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      this.started = {
+        yes: true
+      };
+      this.video.currentTime = 0;
+      return this.video.play();
     };
 
     PlayController.prototype.drawWebcam = function() {
@@ -1743,82 +1766,96 @@
 
     PlayController.prototype.checkTime = function(e) {
       var time;
-      time = this.video.currentTime;
-      if (Math.floor(time) === 2) {
+      time = Math.floor(this.video.currentTime);
+      if (time === 2) {
         this.recordWebcam();
       }
-      if (Math.floor(time) === 20) {
+      if (time === 12) {
         if (this.started.xFrames == null) {
           this.playback('xFrames');
         }
       }
-      if (Math.floor(time) === 28) {
+      if (time === 28) {
         log('stop player');
-        this.smoker.stopIn = 10;
+        this.smoker.stopIn = 20;
       }
-      if (Math.floor(time) === 30) {
+      if (time === 32) {
         if (this.started.firstFace == null) {
           this.playback('firstFace');
         }
       }
-      if (Math.floor(time) === 49) {
-        log('stop player');
-        this.cPlayer.stop = true;
-      }
-      if (Math.floor(time) === 50) {
+      if (time === 37) {
         if (this.started.secondFace == null) {
           this.playback('secondFace');
         }
       }
-      if (Math.floor(time) === 73) {
+      if (time === 46) {
         if (this.started.xFrames2 == null) {
           this.playback('xFrames2');
         }
       }
-      if (Math.floor(time) === 85) {
+      if (time === 52) {
         log('stop player');
         this.cPlayer.stop = true;
       }
-      if (Math.floor(time) === 86) {
+      if (time === 54) {
         if (this.started.xFrames3 == null) {
           this.playback('xFrames3');
         }
       }
-      if (Math.floor(time) === 90) {
-        return this.ctx.putImageData(this.smoker.xFrames2[9], 0, 0);
+      if (time === 59) {
+        log('stop player');
+        this.cPlayer.stop = true;
+      }
+      if (time === 61) {
+        return this.ctx.putImageData(this.smoker.xFrames3[9], 0, 0);
       }
     };
 
     PlayController.prototype.gameTime = function(e) {
       var time;
-      time = this.video.currentTime;
-      if (Math.floor(time) === 127) {
+      time = Math.floor(this.video.currentTime);
+      if (time === 127) {
         this.recordWebcam();
       }
-      if (Math.floor(time) === 180) {
+      if (time === 142) {
         if (this.started.firstFace == null) {
           this.playback('firstFace');
         }
       }
-      if (Math.floor(time) === 187) {
-        if (this.started.xFrames == null) {
-          this.playback('xFrames');
-        }
-      }
-      if (Math.floor(time) === 197) {
+      if (time === 149) {
         if (this.started.secondFace == null) {
           this.playback('secondFace');
         }
       }
-      if (Math.floor(time) === 204) {
-        if (this.started.thirdFace == null) {
-          this.playback('thirdFace');
+      if (time === 155) {
+        if (this.started.xFrames == null) {
+          this.playback('xFrames');
         }
       }
-      if (Math.floor(time) === 210) {
-        if (this.started.thirdFace == null) {
-          return this.playback('alphaFace');
+      if (time === 168) {
+        log('stop player 1');
+        this.smoker.stopIn = 20;
+      }
+      if (time === 174) {
+        if (this.started.xFrames2 == null) {
+          this.playback('xFrames2');
         }
+      }
+      if (time === 187) {
+        this.cPlayer.stop = true;
+      }
+      if (time === 192) {
+        if (this.started.xFrames3 == null) {
+          this.playback('xFrames3');
+        }
+      }
+      if (time === 197) {
+        log('stop player');
+        this.cPlayer.stop = true;
+      }
+      if (time === 200) {
+        return this.ctx.putImageData(this.smoker.xFrames3[9], 0, 0);
       }
     };
 
@@ -1852,6 +1889,9 @@
 
     PlayController.prototype.recordWebcam = function() {
       var secs;
+      if (this.smoker != null) {
+        return;
+      }
       secs = 2;
       if (!this.recorder.started) {
         log('start recording');
@@ -2273,9 +2313,11 @@
             return _this.pulseMouths(ctx, index, 1);
           };
         })(this),
-        start: function() {
-          return new soundAnalyzer().playSound();
-        }
+        start: (function(_this) {
+          return function() {
+            return new soundAnalyzer(_this.player).playSound();
+          };
+        })(this)
       };
       if (this.faces != null) {
         return this.setupZooms();
@@ -2356,6 +2398,7 @@
         } else {
           return this.segments.xFrames3 = {
             frames: this.xFrames3,
+            loop: true,
             addition: (function(_this) {
               return function(ctx, index) {
                 return _this.pulseMouths(ctx, index, 3);
@@ -2384,7 +2427,6 @@
             index = 0;
             _this.segments.firstFace = {
               frames: frames,
-              loop: true,
               addition: _this.fadeInOut
             };
             return _this.getSecondFace(zoomFaces);
@@ -2463,20 +2505,21 @@
     };
 
     Smoker.prototype.drawFaces = function(ctx, index, type) {
-      var face, faces, _i, _len, _results;
+      var face, _i, _len, _ref, _results;
       if (type === 1) {
-        faces = this.faces.slice(0, 1);
+        this.activeFaces = this.faces.slice(0, 1);
       }
       if (type === 2) {
-        faces = this.faces.slice(0, 3);
+        this.activeFaces = this.faces.slice(0, 3);
       }
       if (type === 3) {
-        faces = this.faces;
+        this.activeFaces = this.faces;
       }
-      if (faces.length > 0) {
+      if (this.activeFaces.length > 0) {
+        _ref = this.activeFaces;
         _results = [];
-        for (_i = 0, _len = faces.length; _i < _len; _i++) {
-          face = faces[_i];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          face = _ref[_i];
           _results.push(face.drawFace(ctx, index, type));
         }
         return _results;
@@ -2536,12 +2579,14 @@
 
     Smoker.prototype.pulseMouths = function(ctx, index, type) {
       var face, faces, _i, _len, _results;
+      this.type = type;
       if (this.faces.length > 0) {
         if (type === 1) {
           face = this.faces[0];
           faces = [face];
           if (this.stopIn != null) {
             type = 4;
+            this.type = type;
             this.stopIn--;
             log('stopIn', this.stopIn);
             if (this.stopIn % 2 === 0) {
@@ -2551,7 +2596,8 @@
               ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
               ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
             }
-            if (this.stopIn === 0) {
+            if (this.stopIn < 1) {
+              log('stop for real ' + type);
               this.stopIn = null;
               this.player.cPlayer.stop = true;
             }
