@@ -395,7 +395,9 @@
         return function() {
           _this.shouldAnalyze = false;
           log('average level: ' + _this.all / _this.counter);
-          return log('audio ended');
+          log('audio ended');
+          _this.audioElement.removeEventListener('playing', _this.analyze, false);
+          return $('#poem').remove();
         };
       })(this), false);
       this.audioElement.addEventListener('playing', this.analyze, false);
@@ -404,6 +406,7 @@
 
     soundAnalyzer.prototype.analyze = function() {
       var frequency, magnitude, _i, _len, _ref;
+      log('analyze');
       this.analyzer.getByteFrequencyData(this.frequencyData);
       magnitude = 0;
       _ref = this.frequencyData;

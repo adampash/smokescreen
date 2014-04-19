@@ -286,9 +286,7 @@ class window.soundAnalyzer
     @low = 1000
     @high = 4000
   playSound: (soundURL) ->
-    # http://stackoverflow.com/questions/10105063/how-to-play-a-notification-sound-on-websites 
     @shouldAnalyze = true
-    # soundURL = soundURL or "/assets/audio/awobmolg.m4a"
     soundURL = soundURL or "/assets/audio/AWOBMOLGQUIET.mp3"
     console.log('playing sound: ' + soundURL)
     $('body').append '<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>'
@@ -312,6 +310,8 @@ class window.soundAnalyzer
       @shouldAnalyze = false
       log 'average level: ' + @all/@counter
       log('audio ended')
+      @audioElement.removeEventListener('playing', @analyze, false)
+      $('#poem').remove()
     , false)
     # audioElement.addEventListener('canplaythrough', voiceLoaded, false)
     @audioElement.addEventListener('playing', @analyze, false)
@@ -319,6 +319,7 @@ class window.soundAnalyzer
     $intensity = $("#intensity")
 
   analyze: =>
+    log 'analyze'
     @analyzer.getByteFrequencyData(@frequencyData)
     magnitude = 0
     for frequency in @frequencyData
