@@ -6,7 +6,7 @@ class window.soundAnalyzer
     @high = 4000
   playSound: (soundURL) ->
     @shouldAnalyze = true
-    soundURL = soundURL or "/assets/audio/AWOBMOLGQUIET.mp3"
+    soundURL = soundURL or "/assets/audio/Sound.mp3"
     console.log('playing sound: ' + soundURL)
     $('body').append '<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>'
 

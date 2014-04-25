@@ -1,7 +1,7 @@
 $ ->
-  window.dev = true
+  window.dev = false
   window.log = (args) ->
-    if true
+    if dev
       console.log.apply console,  arguments
 
   if dev
@@ -287,7 +287,7 @@ class window.soundAnalyzer
     @high = 4000
   playSound: (soundURL) ->
     @shouldAnalyze = true
-    soundURL = soundURL or "/assets/audio/AWOBMOLGQUIET.mp3"
+    soundURL = soundURL or "/assets/audio/Sound.mp3"
     console.log('playing sound: ' + soundURL)
     $('body').append '<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>'
 
@@ -1442,6 +1442,8 @@ class PlayController
     @recordCtx = @createContext @recordCanvas
     @activeFaces = []
 
+    # TODO Pick a best size for this; test in face_det
+    # @smallRecord = @createCanvas(480)
     @smallRecord = @createCanvas(720)
     # @smallRecord = @createCanvas(960)
     @smallCtx = @createContext @smallRecord
@@ -1464,16 +1466,19 @@ class PlayController
       $('h1').remove()
       @startPlayer()
 
+  skipTo: (time) ->
+    @video.currentTime = time
+
   startPlayer: ->
-    # @video.currentTime = 121
+    @video.currentTime = 120
     @video.play()
     @webcam = $('#webcam')[0]
     @webcam.src = webcam.src
     @drawWebcam()
 
     @video.addEventListener 'timeupdate', (e) =>
-      @checkTime(e)
-      # @gameTime(e)
+      # @checkTime(e)
+      @gameTime(e)
 
   replay: ->
     @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
@@ -1492,6 +1497,41 @@ class PlayController
     else
       requestAnimationFrame =>
         @drawWebcam()
+
+  gameTime: (e) ->
+    time = Math.floor @video.currentTime
+    # log time
+
+    refTime = 400
+    if (time) is 133
+      @recordWebcam()
+    # if (time) is 21
+    #   @playback('raw') unless @started.raw?
+    if (time) is refTime
+      console.log 'play first face'
+      @playback('firstFace') unless @started.firstFace?
+    if (time) is refTime + 8
+      @playback('secondFace') unless @started.secondFace?
+    if (time) is refTime + 28
+      @playback('xFrames') unless @started.xFrames?
+    if (time) is refTime + 43
+      log 'stop player 1'
+      @smoker.stopIn = 900
+    if time is refTime + 49
+      @cPlayer.stop = true
+    if (time) is refTime + 57
+      @playback('xFrames2') unless @started.xFrames2?
+    if (time) is refTime + 75
+      @cPlayer.stop = true
+    if (time) is refTime + 80
+      @playback('xFrames3') unless @started.xFrames3?
+    if (time) is refTime + 96
+      log 'stop player'
+      @cPlayer.stop = true
+    if (time) is refTime + 117
+      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
+    if (time) is refTime + 122
+      @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
 
 
   checkTime: (e) ->
@@ -1526,35 +1566,6 @@ class PlayController
     if (time) is 61
       @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
 
-  gameTime: (e) ->
-    time = Math.floor @video.currentTime
-    # log time
-
-    if (time) is 127
-      @recordWebcam()
-    # if (time) is 21
-    #   @playback('raw') unless @started.raw?
-    if (time) is 142
-      @playback('firstFace') unless @started.firstFace?
-    if (time) is 149
-      @playback('secondFace') unless @started.secondFace?
-    if (time) is 155
-      @playback('xFrames') unless @started.xFrames?
-    if (time) is 168
-      log 'stop player 1'
-      @smoker.stopIn = 20
-    if (time) is 174
-      @playback('xFrames2') unless @started.xFrames2?
-    if (time) is 187
-      @cPlayer.stop = true
-    if (time) is 192
-      @playback('xFrames3') unless @started.xFrames3?
-    if (time) is 197
-      log 'stop player'
-      @cPlayer.stop = true
-    if (time) is 200
-      @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
-
   playback: (segment) ->
     # debugger if segment is 'alphaFace'
     log 'play ' + segment
@@ -1562,7 +1573,7 @@ class PlayController
     segment = @smoker.segments[segment]
     log 'playing'
     if segment?
-      @cPlayer = new CanvasPlayer @canvas, segment.frames, 15 #@smoker.fps
+      @cPlayer = new CanvasPlayer @canvas, segment.frames, 12 #@smoker.fps
       @cPlayer.play
         loop:       segment.loop
         preprocess: segment.preprocess
@@ -1589,14 +1600,14 @@ class PlayController
           log 'done recording'
           @smoker.setFrames @recorder.capturedFrames.slice(0), @recorder.fps
           @startProcessing @recorder.capturedFrames, @recorder.fps
-          @recordingComplete = true
+          # @recordingComplete = true
 
     unless @smallRecorder.started
       @smallRecorder.record secs, 30,
         complete: =>
           @smoker.setSmall @smallRecorder.capturedFrames
           @smoker.findFaces()
-          @recordingComplete = true
+          # @recordingComplete = true
           log 'now find faces'
           @smallRecorder = null
 
@@ -2165,9 +2176,11 @@ class Smoker
     if index < 30
       alpha = 1 - index/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      # ctx.fillStyle = 'rgba(255, 255, 255,' + alpha + ')'
     else if index > 30
       alpha = index%30/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      # ctx.fillStyle = 'rgba(255, 255, 255,' + alpha + ')'
 
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
 

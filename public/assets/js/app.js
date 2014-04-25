@@ -3,9 +3,9 @@
     __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
   $(function() {
-    window.dev = true;
+    window.dev = false;
     window.log = function(args) {
-      if (true) {
+      if (dev) {
         return console.log.apply(console, arguments);
       }
     };
@@ -374,7 +374,7 @@
     soundAnalyzer.prototype.playSound = function(soundURL) {
       var $intensity, audioContext;
       this.shouldAnalyze = true;
-      soundURL = soundURL || "/assets/audio/AWOBMOLGQUIET.mp3";
+      soundURL = soundURL || "/assets/audio/Sound.mp3";
       console.log('playing sound: ' + soundURL);
       $('body').append('<audio id="poem" autoplay="autoplay"><source src="' + soundURL + '" type="audio/mpeg" /><embed hidden="true" autostart="true" loop="false" src="' + soundURL + '" /></audio>');
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1731,14 +1731,19 @@
       })(this));
     };
 
+    PlayController.prototype.skipTo = function(time) {
+      return this.video.currentTime = time;
+    };
+
     PlayController.prototype.startPlayer = function() {
+      this.video.currentTime = 120;
       this.video.play();
       this.webcam = $('#webcam')[0];
       this.webcam.src = webcam.src;
       this.drawWebcam();
       return this.video.addEventListener('timeupdate', (function(_this) {
         return function(e) {
-          return _this.checkTime(e);
+          return _this.gameTime(e);
         };
       })(this));
     };
@@ -1763,6 +1768,61 @@
             return _this.drawWebcam();
           };
         })(this));
+      }
+    };
+
+    PlayController.prototype.gameTime = function(e) {
+      var refTime, time;
+      time = Math.floor(this.video.currentTime);
+      refTime = 400;
+      if (time === 133) {
+        this.recordWebcam();
+      }
+      if (time === refTime) {
+        console.log('play first face');
+        if (this.started.firstFace == null) {
+          this.playback('firstFace');
+        }
+      }
+      if (time === refTime + 8) {
+        if (this.started.secondFace == null) {
+          this.playback('secondFace');
+        }
+      }
+      if (time === refTime + 28) {
+        if (this.started.xFrames == null) {
+          this.playback('xFrames');
+        }
+      }
+      if (time === refTime + 43) {
+        log('stop player 1');
+        this.smoker.stopIn = 900;
+      }
+      if (time === refTime + 49) {
+        this.cPlayer.stop = true;
+      }
+      if (time === refTime + 57) {
+        if (this.started.xFrames2 == null) {
+          this.playback('xFrames2');
+        }
+      }
+      if (time === refTime + 75) {
+        this.cPlayer.stop = true;
+      }
+      if (time === refTime + 80) {
+        if (this.started.xFrames3 == null) {
+          this.playback('xFrames3');
+        }
+      }
+      if (time === refTime + 96) {
+        log('stop player');
+        this.cPlayer.stop = true;
+      }
+      if (time === refTime + 117) {
+        this.ctx.putImageData(this.smoker.xFrames3[9], 0, 0);
+      }
+      if (time === refTime + 122) {
+        return this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       }
     };
 
@@ -1814,60 +1874,13 @@
       }
     };
 
-    PlayController.prototype.gameTime = function(e) {
-      var time;
-      time = Math.floor(this.video.currentTime);
-      if (time === 127) {
-        this.recordWebcam();
-      }
-      if (time === 142) {
-        if (this.started.firstFace == null) {
-          this.playback('firstFace');
-        }
-      }
-      if (time === 149) {
-        if (this.started.secondFace == null) {
-          this.playback('secondFace');
-        }
-      }
-      if (time === 155) {
-        if (this.started.xFrames == null) {
-          this.playback('xFrames');
-        }
-      }
-      if (time === 168) {
-        log('stop player 1');
-        this.smoker.stopIn = 20;
-      }
-      if (time === 174) {
-        if (this.started.xFrames2 == null) {
-          this.playback('xFrames2');
-        }
-      }
-      if (time === 187) {
-        this.cPlayer.stop = true;
-      }
-      if (time === 192) {
-        if (this.started.xFrames3 == null) {
-          this.playback('xFrames3');
-        }
-      }
-      if (time === 197) {
-        log('stop player');
-        this.cPlayer.stop = true;
-      }
-      if (time === 200) {
-        return this.ctx.putImageData(this.smoker.xFrames3[9], 0, 0);
-      }
-    };
-
     PlayController.prototype.playback = function(segment) {
       log('play ' + segment);
       this.started[segment] = true;
       segment = this.smoker.segments[segment];
       log('playing');
       if (segment != null) {
-        this.cPlayer = new CanvasPlayer(this.canvas, segment.frames, 15);
+        this.cPlayer = new CanvasPlayer(this.canvas, segment.frames, 12);
         return this.cPlayer.play({
           loop: segment.loop,
           preprocess: segment.preprocess,
@@ -1903,8 +1916,7 @@
             return function() {
               log('done recording');
               _this.smoker.setFrames(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
-              _this.startProcessing(_this.recorder.capturedFrames, _this.recorder.fps);
-              return _this.recordingComplete = true;
+              return _this.startProcessing(_this.recorder.capturedFrames, _this.recorder.fps);
             };
           })(this)
         });
@@ -1915,7 +1927,6 @@
             return function() {
               _this.smoker.setSmall(_this.smallRecorder.capturedFrames);
               _this.smoker.findFaces();
-              _this.recordingComplete = true;
               log('now find faces');
               return _this.smallRecorder = null;
             };

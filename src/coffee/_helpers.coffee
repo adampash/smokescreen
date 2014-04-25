@@ -1,7 +1,7 @@
 $ ->
-  window.dev = true
+  window.dev = false
   window.log = (args) ->
-    if true
+    if dev
       console.log.apply console,  arguments
 
   if dev

@@ -252,9 +252,11 @@ class Smoker
     if index < 30
       alpha = 1 - index/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      # ctx.fillStyle = 'rgba(255, 255, 255,' + alpha + ')'
     else if index > 30
       alpha = index%30/30
       ctx.fillStyle = 'rgba(0, 0, 0,' + alpha + ')'
+      # ctx.fillStyle = 'rgba(255, 255, 255,' + alpha + ')'
 
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height)
 
