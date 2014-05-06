@@ -35,7 +35,7 @@ class PlayController
     @video.currentTime = time
 
   startPlayer: ->
-    @video.currentTime = 120
+    # @video.currentTime = 123
     @video.play()
     @webcam = $('#webcam')[0]
     @webcam.src = webcam.src
@@ -67,7 +67,7 @@ class PlayController
     time = Math.floor @video.currentTime
     # log time
 
-    refTime = 400
+    refTime = 373
     if (time) is 133
       @recordWebcam()
     # if (time) is 21
@@ -93,7 +93,7 @@ class PlayController
     if (time) is refTime + 96
       log 'stop player'
       @cPlayer.stop = true
-    if (time) is refTime + 117
+    if (time) is refTime + 118
       @ctx.putImageData(@smoker.xFrames3[9], 0, 0)
     if (time) is refTime + 122
       @ctx.clearRect(0, 0, @canvas.width, @canvas.height)
@@ -154,7 +154,7 @@ class PlayController
 
 
   recordWebcam: ->
-    return if @smoker?
+    return if @smoker? and @smoker.faces? and @smoker.faces.length > 0
     secs = 2
     unless @recorder.started
       log 'start recording'
@@ -165,16 +165,16 @@ class PlayController
           log 'done recording'
           @smoker.setFrames @recorder.capturedFrames.slice(0), @recorder.fps
           @startProcessing @recorder.capturedFrames, @recorder.fps
-          # @recordingComplete = true
+          @recordingComplete = true
 
     unless @smallRecorder.started
       @smallRecorder.record secs, 30,
         complete: =>
           @smoker.setSmall @smallRecorder.capturedFrames
           @smoker.findFaces()
-          # @recordingComplete = true
+          @recordingComplete = true
           log 'now find faces'
-          @smallRecorder = null
+          # @smallRecorder = null
 
   startProcessing: (frames, fps) ->
     frames = frames.slice(0)

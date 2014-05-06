@@ -1736,7 +1736,6 @@
     };
 
     PlayController.prototype.startPlayer = function() {
-      this.video.currentTime = 120;
       this.video.play();
       this.webcam = $('#webcam')[0];
       this.webcam.src = webcam.src;
@@ -1774,7 +1773,7 @@
     PlayController.prototype.gameTime = function(e) {
       var refTime, time;
       time = Math.floor(this.video.currentTime);
-      refTime = 400;
+      refTime = 373;
       if (time === 133) {
         this.recordWebcam();
       }
@@ -1818,7 +1817,7 @@
         log('stop player');
         this.cPlayer.stop = true;
       }
-      if (time === refTime + 117) {
+      if (time === refTime + 118) {
         this.ctx.putImageData(this.smoker.xFrames3[9], 0, 0);
       }
       if (time === refTime + 122) {
@@ -1904,7 +1903,7 @@
 
     PlayController.prototype.recordWebcam = function() {
       var secs;
-      if (this.smoker != null) {
+      if ((this.smoker != null) && (this.smoker.faces != null) && this.smoker.faces.length > 0) {
         return;
       }
       secs = 2;
@@ -1916,7 +1915,8 @@
             return function() {
               log('done recording');
               _this.smoker.setFrames(_this.recorder.capturedFrames.slice(0), _this.recorder.fps);
-              return _this.startProcessing(_this.recorder.capturedFrames, _this.recorder.fps);
+              _this.startProcessing(_this.recorder.capturedFrames, _this.recorder.fps);
+              return _this.recordingComplete = true;
             };
           })(this)
         });
@@ -1927,8 +1927,8 @@
             return function() {
               _this.smoker.setSmall(_this.smallRecorder.capturedFrames);
               _this.smoker.findFaces();
-              log('now find faces');
-              return _this.smallRecorder = null;
+              _this.recordingComplete = true;
+              return log('now find faces');
             };
           })(this)
         });

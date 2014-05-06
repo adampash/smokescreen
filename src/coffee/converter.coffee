@@ -50,6 +50,20 @@ class Converter
       if @foundFaces.length == framesToProcess.length
         window.matchedFaces = new Faces(@foundFaces, ($(document).width()/@width))
         bestBets = matchedFaces.groupFaces()
+        # if face lenght is 0, set timeout and try again
+        # else complete
+        # console.log bestBets
+        # debugger
+        # if bestBets.length is 0
+        #   console.log 'no faces, run again'
+        #   setTimeout ->
+        #     player.recorder.started = false
+        #     player.recorder.reset()
+        #     player.smallRecorder.started = false
+        #     player.smallRecorder.reset()
+        #     player.recordWebcam()
+        #   , 2000
+        # else
         @complete(bestBets, matchedFaces)
     , false)
 
